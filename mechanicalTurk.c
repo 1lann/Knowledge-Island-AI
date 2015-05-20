@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <strings.h>
 
 #include "Game.h"
 #include "mechanicalTurk.h"
@@ -33,6 +34,11 @@
  "LRRLRLL", "LRRLRLRLL", "LRRLRLRLRLL", "LRLRRLL", "LRLRRLRLL",\
  "LRLRRLRLRLL"}
 
+#define NUM_COLUMNS 5
+#define ROWS_FOR_COLUMN {3, 4, 5, 4, 3}
+#define START_LEFT_COLUMN {0, 7, 16, 28, 39}
+#define START_RIGHT_COLUMN {8, 17, 27, 38, 47}
+
 // // return the contents of the given vertex (ie campus code or
 // // VACANT_VERTEX)
 // int getCampus(Game g, path pathToVertex);
@@ -40,15 +46,29 @@
 // // the contents of the given edge (ie ARC code or vacent ARC)
 // int getARC(Game g, path pathToEdge);
 
-typedef struct vertex {
+typedef struct _vertex {
 	int object;
 	char path[PATH_LIMIT];
-};
+	int disciplineA;
+	int disciplineB;
+	int disciplineC;
+} vertex;
 
-typedef struct arc {
+typedef struct _arc {
 	int object;
 	char path[PATH_LIMIT];
-};
+} arc;
+
+typedef struct _pair {
+	int a;
+	int b;
+} pair;
+
+typedef struct _trio {
+	int a;
+	int b;
+	int c;
+} trio;
 
 //
 // The Mapping and Pathing Engine
@@ -71,7 +91,7 @@ int getColumnNum(int position) {
 		columnNum = 5;
 	}
 
-	return columnNum
+	return columnNum;
 }
 
 
@@ -142,17 +162,17 @@ int canJumpRight(int position) {
 		if (position % 2 == 0) {
 			result = TRUE;
 		} else {
-			result = FALSE:
+			result = FALSE;
 		}
 	} else if (column == 1 || column == 4) {
 		if (position % 2 == 0) {
 			result = FALSE;
 		} else {
-			result = TRUE:
+			result = TRUE;
 		}
 	}
 
-	return modResult;
+	return result;
 }
 
 
@@ -173,7 +193,7 @@ int positionLeftFrom(int position, int relativeTo) {
 			sameColumn = TRUE;
 		} else {
 			// You can move left, so you jump
-			result = position + getJumpLeftConversion(position)
+			result = position + getJumpLeftConversion(position);
 		}
 
 	} else if (relativeTo - position == -1) {
@@ -212,10 +232,10 @@ int positionRightFrom(int position, int relativeTo) {
 		// We are moving up the column
 		if (canJumpRight(position)) {
 			// You can move right
-			result = position + getJumpRightConversion(position)
+			result = position + getJumpRightConversion(position);
 		} else {
 			// You can move left, so you jump
-			resilt = position - 1;
+			result = position - 1;
 			sameColumn = TRUE;
 		}
 
@@ -265,7 +285,7 @@ int pathToPosition(path p) {
 
 	i++;
 
-	while (i < pathLen && currentPosition >= 0 && currentPosition < NUM_VERTICES) {
+	while (i < pathLen && currentPosition >= 0 && currentPosition < NUM_INT_VERTICES) {
 		char instruction = p[i];
 		int lastLastPosition = currentPosition;
 
@@ -286,81 +306,186 @@ int pathToPosition(path p) {
 }
 
 
+// Gets value of vertex by itself
+int singleVertexValue(vertex vertices[NUM_INT_VERTICES], int vertexId) {
+	//
+
+}
+
+
+// Get connecting vertices of an arc
+pair getArcVertices(int arcId) {
+
+}
+
+trio getVertexHexes(int vertexId) {
+	int results[3];
+	int resultI = 0;
+
+	results[0] = -1;
+	results[1] = -1;
+	results[2] = -1;
+
+	int rowsForColumns[NUM_COLUMNS] = ROWS_FOR_COLUMN;
+	int startLeftColumns[NUM_COLUMNS] = START_LEFT_COLUMN;
+	int startRightColumns[NUM_COLUMNS] = START_RIGHT_COLUMN;
+
+	// An array of regions, containg the vertices surrounding them.
+	int regionVertices[NUM_REGIONS][6];
+
+	int region = 0;
+
+	int column = 0;
+	while (column < NUM_COLUMNS && resultI < 2) {
+		int row = 0;
+		while (row < rowsForColumns[column]) {
+			int left = startLeftColumns[column] + (row * 2);
+			int right = startRightColumns[column] + (row * 2);
+
+			if (vertexId - left <= 2 && vertexId - left >= 0) {
+				results[resultI] = region;
+				resultI++;
+			}
+
+			region++;
+			row++;
+		}
+
+		column++;
+	}
+
+	trio resultTrio;
+	int allDisciplines[NUM_REGIONS] = DEFAULT_DISCIPLINES;
+
+	if (results[0] >= 0) {
+		resultTrio.a = allDisciplines[results[0]];
+	}
+
+	if (results[1] >= 0) {
+		resultTrio.b = allDisciplines[results[1]];
+	}
+
+	if (results[2] >= 0) {
+		resultTrio.c = allDisciplines[results[2]];
+	}
+
+	return resultTrio;
+}
+
+
 action decideAction(Game g) {
-    action nextAction;
+	action nextAction;
 
-    vertex vertices[NUM_INT_VERTICES];
-    arc arcs[NUM_INT_ARCS];
+	vertex vertices[NUM_INT_VERTICES];
+	arc arcs[NUM_INT_ARCS];
 
-    int currentPlayer = getWhoseTurn(g);
+	int currentPlayer = getWhoseTurn(g);
 
-    int ourCampus;
-    int ourGO8;
-    int ourARC;
+	int myCampus;
+	int myGO8;
+	int myARC;
 
-    if (currentPlayer == UNI_A) {
-    	ourCampus = CAMPUS_A;
-    	ourGO8 = GO8_A;
-    	ourARC = ARC_A;
-    } else if (currentPlayer == UNI_B) {
-    	ourCampus = CAMPUS_B;
-    	ourGO8 = GO8_B;
-    	ourARC = ARC_C;
-    } else if (currentPlayer == UNI_C) {
-    	ourCampus = CAMPUS_C;
-    	ourGO8 = GO8_C;
-    	ourARC = ARC_C;
-    }
+	if (currentPlayer == UNI_A) {
+		myCampus = CAMPUS_A;
+		myGO8 = GO8_A;
+		myARC = ARC_A;
+	} else if (currentPlayer == UNI_B) {
+		myCampus = CAMPUS_B;
+		myGO8 = GO8_B;
+		myARC = ARC_C;
+	} else if (currentPlayer == UNI_C) {
+		myCampus = CAMPUS_C;
+		myGO8 = GO8_C;
+		myARC = ARC_C;
+	}
 
-    char allPaths[NUM_INT_VERTICES][PATH_LIMIT] = ALL_PATHS;
-    char arcPaths[NUM_INT_ARCS - NUM_INT_VERTICES][PATH_LIMIT] = ARC_PATHS;
+	char allPaths[NUM_INT_VERTICES][PATH_LIMIT] = ALL_PATHS;
+	char arcPaths[NUM_INT_ARCS - NUM_INT_VERTICES][PATH_LIMIT] = ARC_PATHS;
 
-    // Populate database
+	// Populate database
 
-    int i = 0;
+	int i = 0;
 
-    while (i < NUM_INT_VERTICES) {
-    	vertex newVertex;
-    	arc newArc;
+	while (i < NUM_INT_VERTICES) {
+		vertex newVertex;
+		arc newArc;
 
-    	newVertex.path = allPaths[i];
-    	newArc.path = allPaths[i];
+		strcpy(newVertex.path, allPaths[i]);
+		strcpy(newArc.path, allPaths[i]);
 
-    	newVertex.object = getCampus(g, allPaths[i]);
-    	newArc.object = getARC(g, allPaths[i]);
+		newVertex.object = getCampus(g, allPaths[i]);
+		newArc.object = getARC(g, allPaths[i]);
 
-    	vertices[i] = newVertex;
-    	arcs[i] = newArc;
+		vertices[i] = newVertex;
+		arcs[i] = newArc;
 
-    	i++;
-    }
+		i++;
+	}
 
-    while (i < NUM_INT_ARCS) {
-    	arc newArc;
+	while (i < NUM_INT_ARCS) {
+		arc newArc;
 
-    	newArc.path = arcPaths[i - NUM_INT_VERTICES];
-    	newArc.object = getARC(g, newArc.path);
+		strcpy(newArc.path, arcPaths[i - NUM_INT_VERTICES]);
+		newArc.object = getARC(g, newArc.path);
 
-    	arcs[i] = newArc;
+		arcs[i] = newArc;
 
-    	i++;
-    }
+		i++;
+	}
 
-    // If we have more than 10 campuses, plan for building GO8s
-    // If we have enough resources to build a GO8...
-    //    Upgrade the most valued campus to a GO8
-
-
-    // Note that this AI will only build ARCs and campuses together at the same time
-    // If we have enouggh resources to build an ARC and campus...
-    // Get a list of all the "edge" nodes
-    // Iterate through each connecting edge nodes, and give them a value
-    // based off the nodes they are connected to.
-    // Their values is summed of the nodes they're connected to, too.
-    // Cumalative values are halved for every node travelled to a maximum of 4 jumps
-    // Then pick the highest scoring sub-node.
-    // If there are multiple highest scoring sub-nodes, pick the one with the lowest index
+	// If we have more than 10 campuses, plan for building GO8s
+	// If we have enough resources to build a GO8...
+	//    Upgrade the most valued campus to a GO8
 
 
-    return nextAction;
+	// Note that this AI will only build ARCs and campuses together at the same time
+	// If we have enough resources to build an ARC and campus...
+	// Get a list of all the "edge" vertices
+	// Iterate through each connecting edge vertices, and give them a value
+	// based off the vertices they are connected to.
+	// Their values is summed of the vertices they're connected to, too.
+	// Cumalative values are halved for every vertex travelled to a maximum of 4 jumps
+	// Then pick the highest scoring sub-vertex.
+	// If there are multiple highest scoring sub-vertices, pick the one with the lowest index
+
+	// Find vertices we own
+
+	int myVertices[NUM_INT_VERTICES]; // Array of vertices that we own
+
+	i = 0;
+	edgeI = 0;
+
+	while (i < NUM_INT_VERTICES) {
+		myVertices[i] = 0;
+
+		if (vertices[i].object == myCampus || vertices[i].object == myGO8) {
+			myVertices[edgeI] = i;
+			edgeI++;
+		}
+		i++;
+	}
+
+	// Now scan through each vertex
+
+
+
+
+
+	// If there are any 2+ left over resources, start spin-offs.
+
+	printf("Done!\n");
+
+
+	return nextAction;
+}
+
+int main() {
+	int defaultDis[] = DEFAULT_DISCIPLINES;
+	int defaultDice[] = DEFAULT_DICE;
+
+	Game thisGame = newGame(defaultDis, defaultDice);
+	throwDice(thisGame, 2);
+	action thisAction = decideAction(thisGame);
+
+	if (thisAction == )
 }
