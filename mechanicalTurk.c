@@ -34,10 +34,18 @@
  "LRRLRLL", "LRRLRLRLL", "LRRLRLRLRLL", "LRLRRLL", "LRLRRLRLL",\
  "LRLRRLRLRLL"}
 
+#define NUM_DISCIPLINES 6
+
 #define NUM_COLUMNS 5
 #define ROWS_FOR_COLUMN {3, 4, 5, 4, 3}
 #define START_LEFT_COLUMN {0, 7, 16, 28, 39}
 #define START_RIGHT_COLUMN {8, 17, 27, 38, 47}
+
+#define START_BRIDGE_LEFT {2, 9, 18, 30, 41}
+#define START_BRIDGE_RIGHT {10, 19, 29, 40, 44}
+
+// Order: THD, BPS, BQN, MJ, MTV, MMONEY
+#define WEIGHTINGS {0, 30, 30, 50, 30, 40}
 
 // // return the contents of the given vertex (ie campus code or
 // // VACANT_VERTEX)
@@ -306,18 +314,51 @@ int pathToPosition(path p) {
 }
 
 
-// Gets value of vertex by itself
-int singleVertexValue(vertex vertices[NUM_INT_VERTICES], int vertexId) {
-	//
-
-}
-
-
 // Get connecting vertices of an arc
 pair getArcVertices(int arcId) {
+	pair arcPairs[NUM_INT_ARCS];
 
+	int i = 0;
+
+	while (i < NUM_INT_VERTICES) {
+		pair newPair;
+		newPair.a = i;
+		newPair.b = i - 1;
+		arcPairs[i] = newPair;
+	}
+
+	arcPairs[0].b = 8;
+	arcPairs[7].b = 17;
+	arcPairs[27].b = 16;
+	arcPairs[38].b = 28;
+	arcPairs[47].b = 39;
+
+	int startLeft[] = START_BRIDGE_LEFT;
+	int startRight[] = START_BRIDGE_RIGHT;
+	int columnRows[] = ROWS_FOR_COLUMN;
+
+	i = NUM_INT_VERTICES;
+	int column = 0;
+
+	while (column < NUM_COLUMNS) {
+		int row = 0;
+
+		while (row < columnRows[column] + 1) {
+			arcPairs[i].a = startLeft[column] + (row * 2);
+			arcPairs[i].b = startRight[column] + (row * 2);
+			row++;
+			i++;
+		}
+
+
+		column++;
+	}
+
+	return arcPairs[arcId];
 }
 
+
+// Returns the disciplines of surrounding hexes of a vertices
 trio getVertexHexes(int vertexId) {
 	int results[3];
 	int resultI = 0;
@@ -359,17 +400,74 @@ trio getVertexHexes(int vertexId) {
 
 	if (results[0] >= 0) {
 		resultTrio.a = allDisciplines[results[0]];
+	} else {
+		resultTrio.a = -1;
 	}
 
 	if (results[1] >= 0) {
 		resultTrio.b = allDisciplines[results[1]];
+	} else {
+		resultTrio.b = -1;
 	}
 
 	if (results[2] >= 0) {
 		resultTrio.c = allDisciplines[results[2]];
+	} else {
+		resultTrio.c = -1;
 	}
 
 	return resultTrio;
+}
+
+
+// Gets value of vertex by itself
+int singleVertexValue(vertex vertices[NUM_INT_VERTICES],
+	int myVertices[NUM_INT_VERTICES], int numMyVertices, int vertexId) {
+
+	int weightings[NUM_DISCIPLINES] = WEIGHTINGS;
+	int subWeightings[NUM_DISCIPLINES];
+
+	int i = 0;
+
+	while (i < NUM_DISCIPLINES) {
+		subWeightings[i] = 0;
+		i++;
+	}
+
+	i = 0;
+
+	while (i < numMyVertices) {
+		trio myHexes = getVertexHexes(myVertices[i]);
+
+		if (myHexes.a >= 0) {
+			subWeightings[myHexes.a] += 1;
+		}
+
+		if (myHexes.b >= 0) {
+			subWeightings[myHexes.b] += 1;
+		}
+
+		if (myHexes.c >= 0) {
+			subWeightings[myHexes.c] += 1;
+		}
+	}
+
+	int sum = 0;
+	trio hexes = getVertexHexes(vertexId);
+
+	if (hexes.a >= 0) {
+		sum += weightings[hexes.a] - subWeightings[hexes.a];
+	}
+
+	if (hexes.b >= 0) {
+		sum += weightings[hexes.b] - subWeightings[hexes.b];
+	}
+
+	if (hexes.c >= 0) {
+		sum += weightings[hexes.c] - subWeightings[hexes.c];
+	}
+
+	return sum;
 }
 
 
@@ -443,8 +541,9 @@ action decideAction(Game g) {
 	// Get a list of all the "edge" vertices
 	// Iterate through each connecting edge vertices, and give them a value
 	// based off the vertices they are connected to.
+	// For every campus of already existing resource, a point is subtracted
 	// Their values is summed of the vertices they're connected to, too.
-	// Cumalative values are halved for every vertex travelled to a maximum of 4 jumps
+	// Cumalative values are *0.7 for every vertex travelled to a maximum of 4 jumps
 	// Then pick the highest scoring sub-vertex.
 	// If there are multiple highest scoring sub-vertices, pick the one with the lowest index
 
@@ -453,7 +552,7 @@ action decideAction(Game g) {
 	int myVertices[NUM_INT_VERTICES]; // Array of vertices that we own
 
 	i = 0;
-	edgeI = 0;
+	int edgeI = 0;
 
 	while (i < NUM_INT_VERTICES) {
 		myVertices[i] = 0;
@@ -471,7 +570,7 @@ action decideAction(Game g) {
 
 
 
-	// If there are any 2+ left over resources, start spin-offs.
+	// If there are any 3+ (or more) left over resources, start spin-offs.
 
 	printf("Done!\n");
 
@@ -486,6 +585,4 @@ int main() {
 	Game thisGame = newGame(defaultDis, defaultDice);
 	throwDice(thisGame, 2);
 	action thisAction = decideAction(thisGame);
-
-	if (thisAction == )
 }
