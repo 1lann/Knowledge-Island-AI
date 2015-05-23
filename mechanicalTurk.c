@@ -555,7 +555,8 @@ int getRecursiveVertexWeight(vertex vertices[NUM_INT_VERTICES],
 				trio neighbours = getNeighbouringVertices(layerQueue[layer][i]);
 				int queuePusher = 0;
 
-				if (neighbours.a >= 0 && !seen[neighbours.a]) {
+				if (neighbours.a >= 0 && !seen[neighbours.a] &&
+					!alreadyOwnVertex(myVertices, neighbours.a)) {
 					layerQueue[layer + 1][queuePusher] = neighbours.a;
 					sum += (double)getSingleVertexWeight(vertices,
 						myVertices, numMyVertices, neighbours.a) *
@@ -563,7 +564,8 @@ int getRecursiveVertexWeight(vertex vertices[NUM_INT_VERTICES],
 					queuePusher++;
 				}
 
-				if (neighbours.b >= 0 && !seen[neighbours.b]) {
+				if (neighbours.b >= 0 && !seen[neighbours.b] &&
+					!alreadyOwnVertex(myVertices, neighbours.b)) {
 					layerQueue[layer + 1][queuePusher] = neighbours.b;
 					sum += (double)getSingleVertexWeight(vertices,
 						myVertices, numMyVertices, neighbours.b) *
@@ -571,7 +573,8 @@ int getRecursiveVertexWeight(vertex vertices[NUM_INT_VERTICES],
 					queuePusher++;
 				}
 
-				if (neighbours.c >= 0 && !seen[neighbours.c]) {
+				if (neighbours.c >= 0 && !seen[neighbours.c] &&
+					!alreadyOwnVertex(myVertices, neighbours.c)) {
 					layerQueue[layer + 1][queuePusher] = neighbours.c;
 					sum += (double)getSingleVertexWeight(vertices,
 						myVertices, numMyVertices, neighbours.c) *
@@ -588,18 +591,18 @@ int getRecursiveVertexWeight(vertex vertices[NUM_INT_VERTICES],
 }
 
 
-// int alreadyOwnVertex(int myVertices[NUM_INT_VERTICES], int queryVertex) {
-// 	int i = 0;
-// 	int match = FALSE;
+int alreadyOwnVertex(int myVertices[NUM_INT_VERTICES], int queryVertex) {
+	int i = 0;
+	int match = FALSE;
 
-// 	while (i < NUM_INT_VERTICES && !match) {
-// 		if (myVertices[i].object == queryVertex) {
-// 			match = TRUE;
-// 		}
-// 	}
+	while (i < NUM_INT_VERTICES && !match) {
+		if (myVertices[i] == queryVertex) {
+			match = TRUE;
+		}
+	}
 
-// 	return match;
-// }
+	return match;
+}
 
 
 void sortWeights(weightedVertex *list, int arraySize) {
