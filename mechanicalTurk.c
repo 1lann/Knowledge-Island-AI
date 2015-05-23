@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <strings.h>
+#include <math.h>
 
 #include "Game.h"
 #include "mechanicalTurk.h"
@@ -47,6 +48,9 @@
 // Order: THD, BPS, BQN, MJ, MTV, MMONEY
 #define WEIGHTINGS {0, 30, 30, 50, 30, 40}
 
+#define SEARCH_DEPTH 4
+#define DEPTH_MULTIPLIER 0.5
+
 // // return the contents of the given vertex (ie campus code or
 // // VACANT_VERTEX)
 // int getCampus(Game g, path pathToVertex);
@@ -77,6 +81,11 @@ typedef struct _trio {
 	int b;
 	int c;
 } trio;
+
+typedef struct _weightedVertex {
+	int vertexId;
+	int weight;
+} weightedVertex;
 
 //
 // The Mapping and Pathing Engine
@@ -358,6 +367,41 @@ pair getArcVertices(int arcId) {
 }
 
 
+trio getNeighbouringVertices(int vertexId) {
+	int results[3];
+	int resultsIterator = 0;
+	int i = 0;
+
+	while (i < NUM_INT_VERTICES) {
+		pair result = getArcVertices(i);
+
+		if (result.a == vertexId) {
+			results[resultsIterator] = result.b;
+			resultsIterator++;
+		} else if (result.b == vertexId) {
+			results[resultsIterator] = result.a;
+			resultsIterator++;
+		}
+
+		i++;
+	}
+
+	trio resultTrio;
+
+	if (resultsIterator >= 0) {
+		resultTrio.a = results[0];
+	}
+	if (resultsIterator >= 1) {
+		resultTrio.b = results[1];
+	}
+	if (resultsIterator >= 2) {
+		resultTrio.c = results[2];
+	}
+
+	return resultTrio;
+}
+
+
 // Returns the disciplines of surrounding hexes of a vertices
 trio getVertexHexes(int vertexId) {
 	int results[3];
@@ -421,16 +465,16 @@ trio getVertexHexes(int vertexId) {
 
 
 // Gets value of vertex by itself
-int singleVertexValue(vertex vertices[NUM_INT_VERTICES],
+int getSingleVertexWeight(vertex vertices[NUM_INT_VERTICES],
 	int myVertices[NUM_INT_VERTICES], int numMyVertices, int vertexId) {
 
-	int weightings[NUM_DISCIPLINES] = WEIGHTINGS;
-	int subWeightings[NUM_DISCIPLINES];
+	int weights[NUM_DISCIPLINES] = WEIGHTINGS;
+	int subWeights[NUM_DISCIPLINES];
 
 	int i = 0;
 
 	while (i < NUM_DISCIPLINES) {
-		subWeightings[i] = 0;
+		subWeights[i] = 0;
 		i++;
 	}
 
@@ -440,15 +484,15 @@ int singleVertexValue(vertex vertices[NUM_INT_VERTICES],
 		trio myHexes = getVertexHexes(myVertices[i]);
 
 		if (myHexes.a >= 0) {
-			subWeightings[myHexes.a] += 1;
+			subWeights[myHexes.a] += 1;
 		}
 
 		if (myHexes.b >= 0) {
-			subWeightings[myHexes.b] += 1;
+			subWeights[myHexes.b] += 1;
 		}
 
 		if (myHexes.c >= 0) {
-			subWeightings[myHexes.c] += 1;
+			subWeights[myHexes.c] += 1;
 		}
 	}
 
@@ -456,18 +500,127 @@ int singleVertexValue(vertex vertices[NUM_INT_VERTICES],
 	trio hexes = getVertexHexes(vertexId);
 
 	if (hexes.a >= 0) {
-		sum += weightings[hexes.a] - subWeightings[hexes.a];
+		sum += weights[hexes.a] - subWeights[hexes.a];
 	}
 
 	if (hexes.b >= 0) {
-		sum += weightings[hexes.b] - subWeightings[hexes.b];
+		sum += weights[hexes.b] - subWeights[hexes.b];
 	}
 
 	if (hexes.c >= 0) {
-		sum += weightings[hexes.c] - subWeightings[hexes.c];
+		sum += weights[hexes.c] - subWeights[hexes.c];
 	}
 
 	return sum;
+}
+
+
+int getRecursiveVertexWeight(vertex vertices[NUM_INT_VERTICES],
+	int myVertices[NUM_INT_VERTICES], int numMyVertices, int vertexId) {
+
+	int layerQueue[SEARCH_DEPTH + 1][NUM_INT_VERTICES];
+
+	// Clear table
+	int layer = 0;
+	while (layer < SEARCH_DEPTH + 1) {
+		int i = 0;
+		while (i < NUM_INT_VERTICES) {
+			layerQueue[layer][i] = -1;
+		}
+	}
+
+	layerQueue[0][0] = vertexId;
+
+	int seen[NUM_INT_VERTICES];
+
+	int i = 0;
+	while (i < NUM_INT_VERTICES) {
+		seen[i] = FALSE;
+		i++;
+	}
+
+	seen[vertexId] = TRUE;
+
+	double sum = (double)getSingleVertexWeight(vertices,
+		myVertices, numMyVertices, vertexId);
+
+	layer = 0;
+	while (layer < SEARCH_DEPTH) {
+		int endOfQueue = FALSE;
+		int i = 0;
+		while (i < NUM_INT_VERTICES && !endOfQueue) {
+			if (layerQueue[layer][i] < 0) {
+				endOfQueue = TRUE;
+			} else {
+				trio neighbours = getNeighbouringVertices(layerQueue[layer][i]);
+				int queuePusher = 0;
+
+				if (neighbours.a >= 0 && !seen[neighbours.a]) {
+					layerQueue[layer + 1][queuePusher] = neighbours.a;
+					sum += (double)getSingleVertexWeight(vertices,
+						myVertices, numMyVertices, neighbours.a) *
+						pow(DEPTH_MULTIPLIER, layer);
+					queuePusher++;
+				}
+
+				if (neighbours.b >= 0 && !seen[neighbours.b]) {
+					layerQueue[layer + 1][queuePusher] = neighbours.b;
+					sum += (double)getSingleVertexWeight(vertices,
+						myVertices, numMyVertices, neighbours.b) *
+						pow(DEPTH_MULTIPLIER, layer);
+					queuePusher++;
+				}
+
+				if (neighbours.c >= 0 && !seen[neighbours.c]) {
+					layerQueue[layer + 1][queuePusher] = neighbours.c;
+					sum += (double)getSingleVertexWeight(vertices,
+						myVertices, numMyVertices, neighbours.c) *
+						pow(DEPTH_MULTIPLIER, layer);
+					queuePusher++;
+				}
+
+				i++;
+			}
+		}
+	}
+
+	return (int)sum;
+}
+
+
+// int alreadyOwnVertex(int myVertices[NUM_INT_VERTICES], int queryVertex) {
+// 	int i = 0;
+// 	int match = FALSE;
+
+// 	while (i < NUM_INT_VERTICES && !match) {
+// 		if (myVertices[i].object == queryVertex) {
+// 			match = TRUE;
+// 		}
+// 	}
+
+// 	return match;
+// }
+
+
+void sortWeights(weightedVertex *list, int arraySize) {
+	int changesMade = TRUE;
+
+	while (changesMade) {
+		changesMade = FALSE;
+
+		int i = 1;
+		while (i < arraySize) {
+			if (list[i].weight > list[i - 1].weight) {
+				int newFirst = list[i - 1].weight;
+				list[i - 1].weight = list[i].weight;
+				list[i].weight = newFirst;
+
+				changesMade = TRUE;
+			}
+
+			i++;
+		}
+	}
 }
 
 
@@ -540,10 +693,10 @@ action decideAction(Game g) {
 	// If we have enough resources to build an ARC and campus...
 	// Get a list of all the "edge" vertices
 	// Iterate through each connecting edge vertices, and give them a value
-	// based off the vertices they are connected to.
+	// based off the hexes they are connected to.
 	// For every campus of already existing resource, a point is subtracted
 	// Their values is summed of the vertices they're connected to, too.
-	// Cumalative values are *0.7 for every vertex travelled to a maximum of 4 jumps
+	// Cumalative values are halved for every vertex travelled to a maximum of 4 jumps
 	// Then pick the highest scoring sub-vertex.
 	// If there are multiple highest scoring sub-vertices, pick the one with the lowest index
 
@@ -552,25 +705,79 @@ action decideAction(Game g) {
 	int myVertices[NUM_INT_VERTICES]; // Array of vertices that we own
 
 	i = 0;
-	int edgeI = 0;
+	int numMyVertices = 0;
 
 	while (i < NUM_INT_VERTICES) {
-		myVertices[i] = 0;
+		myVertices[i] = -1;
 
 		if (vertices[i].object == myCampus || vertices[i].object == myGO8) {
-			myVertices[edgeI] = i;
-			edgeI++;
+			myVertices[numMyVertices] = i;
+			numMyVertices++;
 		}
 		i++;
 	}
 
-	// Now scan through each vertex
+	// Now scan through each vertex and store neighbours
+
+	int consideration[NUM_INT_VERTICES]; // Array of vertices that are accessible and aren't owned
+
+	i = 0;
+	while (i < NUM_INT_VERTICES) {
+		consideration[i] = -1;
+		i++;
+	}
+
+	i = 0;
+	int numConsiderations = 0;
+
+	while (i < numMyVertices) {
+		trio neighbouring = getNeighbouringVertices(myVertices[i]);
+
+		if (neighbouring.a >= 0 && vertices[neighbouring.a].object == VACANT_VERTEX) {
+			consideration[numConsiderations] = neighbouring.a;
+			numConsiderations++;
+		}
+		if (neighbouring.b >= 0 && vertices[neighbouring.b].object == VACANT_VERTEX) {
+			consideration[numConsiderations] = neighbouring.b;
+			numConsiderations++;
+		}
+		if (neighbouring.c >= 0 && vertices[neighbouring.c].object == VACANT_VERTEX) {
+			consideration[numConsiderations] = neighbouring.c;
+			numConsiderations++;
+		}
+
+		i++;
+	}
+
+	// Now get the weight values of each consideration
+
+	weightedVertex sortedWeights[numConsiderations];
+
+	i = 0;
+	while (i < numConsiderations) {
+		int weight = getRecursiveVertexWeight(vertices, myVertices, numMyVertices,
+			consideration[i]);
+		weightedVertex newVertex;
+		newVertex.weight = weight;
+		newVertex.vertexId = consideration[i];
+
+		sortedWeights[i] = newVertex;
+
+		i++;
+	}
+
+	sortWeights(sortedWeights, numConsiderations);
+
+	// Buy in order of weighting
 
 
+	// Attempt actions by weighted order, checking if they're legal
 
 
+	// If there are any 3+ left over resources, start spin-offs. Check if legal.
 
-	// If there are any 3+ (or more) left over resources, start spin-offs.
+	// If there is an outlier resource with 7+ left over, exchange them to
+	// resource we have least have excluding THDs. Check if legal.
 
 	printf("Done!\n");
 
