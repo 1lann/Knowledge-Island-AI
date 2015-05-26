@@ -407,19 +407,19 @@ trio getNeighbouringVertices(int vertexId) {
 
 	trio resultTrio;
 
-	if (resultsIterator >= 0) {
+	if (resultsIterator > 0) {
 		resultTrio.a = results[0];
 	} else {
 		resultTrio.a = -1;
 	}
 
-	if (resultsIterator >= 1) {
+	if (resultsIterator > 1) {
 		resultTrio.b = results[1];
 	} else {
 		resultTrio.b = -1;
  	}
 
-	if (resultsIterator >= 2) {
+	if (resultsIterator > 2) {
 		resultTrio.c = results[2];
 	} else {
 		resultTrio.c = -1;
