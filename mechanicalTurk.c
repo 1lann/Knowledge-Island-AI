@@ -648,7 +648,7 @@ int getRecursiveVertexWeight(vertex vertices[NUM_INT_VERTICES],
 
 
 int canBuildCampusOn(vertex vertices[NUM_INT_VERTICES], int id) {
-	int result = TRUE:
+	int result = TRUE;
 
 	trio neighbours = getNeighbouringVertices(id);
 
@@ -841,7 +841,7 @@ action decideAction(Game g) {
 		i++;
 	}
 
-	traceVertex considerations[NUM_INT_VERTICES]; // Array of possible vertices
+	traceVertex consideration[NUM_INT_VERTICES]; // Array of possible vertices
 
 	i = 0;
 	int numConsiderations = 0;
@@ -857,7 +857,7 @@ action decideAction(Game g) {
 				traceVertex newVertex = intermediate[i];
 				strcpy(newVertex.path[1], arcs[arcId].path);
 
-				considerations[numConsiderations] = newVertex;
+				consideration[numConsiderations] = newVertex;
 				numConsiderations++;
 			}
 		}
@@ -870,7 +870,7 @@ action decideAction(Game g) {
 				traceVertex newVertex = intermediate[i];
 				strcpy(newVertex.path[1], arcs[arcId].path);
 
-				considerations[numConsiderations] = newVertex;
+				consideration[numConsiderations] = newVertex;
 				numConsiderations++;
 			}
 		}
@@ -883,10 +883,12 @@ action decideAction(Game g) {
 				traceVertex newVertex = intermediate[i];
 				strcpy(newVertex.path[1], arcs[arcId].path);
 
-				considerations[numConsiderations] = newVertex;
+				consideration[numConsiderations] = newVertex;
 				numConsiderations++;
 			}
 		}
+
+		i++;
 	}
 
 	printf("Determined considerations\n");
@@ -898,7 +900,7 @@ action decideAction(Game g) {
 	i = 0;
 	while (i < numConsiderations) {
 		int weight = getRecursiveVertexWeight(vertices, myVertices, numMyVertices,
-			consideration[i]);
+			consideration[i].id);
 		weightedVertex newVertex;
 		newVertex.weight = weight;
 		newVertex.originVertex = consideration[i];
