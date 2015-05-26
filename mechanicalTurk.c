@@ -334,6 +334,7 @@ pair getArcVertices(int arcId) {
 		newPair.a = i;
 		newPair.b = i - 1;
 		arcPairs[i] = newPair;
+		i++;
 	}
 
 	arcPairs[0].b = 8;
@@ -352,18 +353,36 @@ pair getArcVertices(int arcId) {
 	while (column < NUM_COLUMNS) {
 		int row = 0;
 
-		while (row < columnRows[column] + 1) {
+		while (row < columnRows[column]) {
 			arcPairs[i].a = startLeft[column] + (row * 2);
 			arcPairs[i].b = startRight[column] + (row * 2);
 			row++;
 			i++;
 		}
 
-
 		column++;
 	}
 
 	return arcPairs[arcId];
+}
+
+
+int getArcIdFromVertices(int firstId, int secondId) {
+	int i = 0;
+	int result = -1;
+	while (i < NUM_INT_ARCS && result < 0) {
+		pair vertexPair = getArcVertices(i);
+
+		if (vertexPair.a == firstId && vertexPair.b == secondId) {
+			result = i;
+		} else if (vertexPair.a == secondId && vertexPair.b == firstId) {
+			result = i;
+		}
+
+		i++;
+	}
+
+	return result;
 }
 
 
@@ -390,12 +409,20 @@ trio getNeighbouringVertices(int vertexId) {
 
 	if (resultsIterator >= 0) {
 		resultTrio.a = results[0];
+	} else {
+		resultTrio.a = -1;
 	}
+
 	if (resultsIterator >= 1) {
 		resultTrio.b = results[1];
-	}
+	} else {
+		resultTrio.b = -1;
+ 	}
+
 	if (resultsIterator >= 2) {
 		resultTrio.c = results[2];
+	} else {
+		resultTrio.c = -1;
 	}
 
 	return resultTrio;
@@ -494,6 +521,8 @@ int getSingleVertexWeight(vertex vertices[NUM_INT_VERTICES],
 		if (myHexes.c >= 0) {
 			subWeights[myHexes.c] += 1;
 		}
+
+		i++;
 	}
 
 	int sum = 0;
@@ -515,6 +544,22 @@ int getSingleVertexWeight(vertex vertices[NUM_INT_VERTICES],
 }
 
 
+int alreadyOwnVertex(int myVertices[NUM_INT_VERTICES], int queryVertex) {
+	int i = 0;
+	int match = FALSE;
+
+	while (i < NUM_INT_VERTICES && !match) {
+		if (myVertices[i] == queryVertex) {
+			match = TRUE;
+		}
+
+		i++;
+	}
+
+	return match;
+}
+
+
 int getRecursiveVertexWeight(vertex vertices[NUM_INT_VERTICES],
 	int myVertices[NUM_INT_VERTICES], int numMyVertices, int vertexId) {
 
@@ -526,7 +571,11 @@ int getRecursiveVertexWeight(vertex vertices[NUM_INT_VERTICES],
 		int i = 0;
 		while (i < NUM_INT_VERTICES) {
 			layerQueue[layer][i] = -1;
+
+			i++;
 		}
+
+		layer++;
 	}
 
 	layerQueue[0][0] = vertexId;
@@ -585,23 +634,11 @@ int getRecursiveVertexWeight(vertex vertices[NUM_INT_VERTICES],
 				i++;
 			}
 		}
+
+		layer++;
 	}
 
 	return (int)sum;
-}
-
-
-int alreadyOwnVertex(int myVertices[NUM_INT_VERTICES], int queryVertex) {
-	int i = 0;
-	int match = FALSE;
-
-	while (i < NUM_INT_VERTICES && !match) {
-		if (myVertices[i] == queryVertex) {
-			match = TRUE;
-		}
-	}
-
-	return match;
 }
 
 
@@ -627,8 +664,23 @@ void sortWeights(weightedVertex *list, int arraySize) {
 }
 
 
+int enoughToBuildCampus(Game g, int playerId) {
+	int result = FALSE;
+
+	if (getStudents(g, playerId, STUDENT_BPS) >= 2 &&
+		getStudents(g, playerId, STUDENT_BQN) >= 2 &&
+		getStudents(g, playerId, STUDENT_MJ) >= 1 &&
+		getStudents(g, playerId, STUDENT_MTV) >= 1) {
+		result = TRUE;
+	}
+
+	return result;
+}
+
+
 action decideAction(Game g) {
 	action nextAction;
+	nextAction.actionCode = PASS;
 
 	vertex vertices[NUM_INT_VERTICES];
 	arc arcs[NUM_INT_ARCS];
@@ -687,6 +739,8 @@ action decideAction(Game g) {
 		i++;
 	}
 
+	printf("Populated database\n");
+
 	// If we have more than 10 campuses, plan for building GO8s
 	// If we have enough resources to build a GO8...
 	//    Upgrade the most valued campus to a GO8
@@ -720,6 +774,8 @@ action decideAction(Game g) {
 		i++;
 	}
 
+	printf("Found our vertices\n");
+
 	// Now scan through each vertex and store neighbours
 
 	int consideration[NUM_INT_VERTICES]; // Array of vertices that are accessible and aren't owned
@@ -752,6 +808,8 @@ action decideAction(Game g) {
 		i++;
 	}
 
+	printf("Determined considerations\n");
+
 	// Now get the weight values of each consideration
 
 	weightedVertex sortedWeights[numConsiderations];
@@ -771,10 +829,62 @@ action decideAction(Game g) {
 
 	sortWeights(sortedWeights, numConsiderations);
 
+	printf("Weighted considerations\n");
+
 	// Buy in order of weighting
 
+	int attempt = 0;
 
-	// Attempt actions by weighted order, checking if they're legal
+	while (attempt < numConsiderations &&
+		enoughToBuildCampus(g, currentPlayer)) {
+		int vertexId = sortedWeights[attempt].vertexId;
+
+		trio neighbours = getNeighbouringVertices(vertexId);
+
+		int i = 0;
+		int fromId = -1;
+		while (i < numMyVertices && fromId < 0) {
+			if (myVertices[i] == neighbours.a ||
+				myVertices[i] == neighbours.b ||
+				myVertices[i] == neighbours.c) {
+				fromId = myVertices[i];
+			}
+			i++;
+		}
+
+		int arcId = getArcIdFromVertices(vertexId, fromId);
+		if (arcId < 0) {
+			printf("Could not find path between %d and %d!\n", vertexId, fromId);
+		} else {
+			action pathAction;
+
+			pathAction.actionCode = OBTAIN_ARC;
+			strcpy(pathAction.destination, arcs[arcId].path);
+
+			if (!isLegalAction(g, pathAction)) {
+				printf("ARC between %d and %d is not legal?\n", vertexId, fromId);
+			} else {
+				printf("Bought ARC between %d and %d\n", vertexId, fromId);
+				makeAction(g, pathAction);
+			}
+
+			action campusAction;
+
+			strcpy(campusAction.destination, vertices[vertexId].path);
+			campusAction.actionCode = BUILD_CAMPUS;
+
+			if (!isLegalAction(g, campusAction)) {
+				printf("Campus at %d is not legal?\n", vertexId);
+			} else {
+				printf("Built campus at %d\n", vertexId);
+				makeAction(g, campusAction);
+			}
+		}
+
+		attempt++;
+	}
+
+	printf("Campuses purchased\n");
 
 
 	// If there are any 3+ left over resources, start spin-offs. Check if legal.
@@ -782,7 +892,6 @@ action decideAction(Game g) {
 	// If there is an outlier resource with 7+ left over, exchange them to
 	// resource we have least have excluding THDs. Check if legal.
 
-	printf("Done!\n");
 
 
 	return nextAction;
