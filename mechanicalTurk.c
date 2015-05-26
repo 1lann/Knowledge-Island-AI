@@ -66,6 +66,11 @@ typedef struct _vertex {
 	int disciplineC;
 } vertex;
 
+typedef struct _traceVertex {
+	int id;
+	char path[3][PATH_LIMIT];
+} traceVertex;
+
 typedef struct _arc {
 	int object;
 	char path[PATH_LIMIT];
@@ -83,7 +88,7 @@ typedef struct _trio {
 } trio;
 
 typedef struct _weightedVertex {
-	int vertexId;
+	traceVertex originVertex;
 	int weight;
 } weightedVertex;
 
@@ -642,6 +647,21 @@ int getRecursiveVertexWeight(vertex vertices[NUM_INT_VERTICES],
 }
 
 
+int canBuildCampusOn(vertex vertices[NUM_INT_VERTICES], int id) {
+	int result = TRUE:
+
+	trio neighbours = getNeighbouringVertices(id);
+
+	if ((neighbours.a >= 0 && vertices[neighbours.a].object != VACANT_VERTEX) ||
+		(neighbours.b >= 0 && vertices[neighbours.b].object != VACANT_VERTEX) ||
+		(neighbours.c >= 0 && vertices[neighbours.c].object != VACANT_VERTEX)) {
+		result = FALSE;
+	}
+
+	return result;
+}
+
+
 void sortWeights(weightedVertex *list, int arraySize) {
 	int changesMade = TRUE;
 
@@ -778,34 +798,95 @@ action decideAction(Game g) {
 
 	// Now scan through each vertex and store neighbours
 
-	int consideration[NUM_INT_VERTICES]; // Array of vertices that are accessible and aren't owned
+	// Array of vertices that are accessible and aren't owned
+	traceVertex intermediate[NUM_INT_VERTICES];
 
 	i = 0;
-	while (i < NUM_INT_VERTICES) {
-		consideration[i] = -1;
-		i++;
-	}
-
-	i = 0;
-	int numConsiderations = 0;
+	int numIntermediate = 0;
 
 	while (i < numMyVertices) {
 		trio neighbouring = getNeighbouringVertices(myVertices[i]);
 
 		if (neighbouring.a >= 0 && vertices[neighbouring.a].object == VACANT_VERTEX) {
-			consideration[numConsiderations] = neighbouring.a;
-			numConsiderations++;
+			int arcId = getArcIdFromVertices(myVertices[i], neighbouring.a);
+
+			traceVertex newVertex;
+			newVertex.id = neighbouring.a;
+			strcpy(newVertex.path[0], arcs[arcId].path);
+
+			intermediate[numIntermediate] = newVertex;
+			numIntermediate++;
 		}
 		if (neighbouring.b >= 0 && vertices[neighbouring.b].object == VACANT_VERTEX) {
-			consideration[numConsiderations] = neighbouring.b;
-			numConsiderations++;
+			int arcId = getArcIdFromVertices(myVertices[i], neighbouring.b);
+
+			traceVertex newVertex;
+			newVertex.id = neighbouring.b;
+			strcpy(newVertex.path[0], arcs[arcId].path);
+
+			intermediate[numIntermediate] = newVertex;
+			numIntermediate++;
 		}
 		if (neighbouring.c >= 0 && vertices[neighbouring.c].object == VACANT_VERTEX) {
-			consideration[numConsiderations] = neighbouring.c;
-			numConsiderations++;
+			int arcId = getArcIdFromVertices(myVertices[i], neighbouring.c);
+
+			traceVertex newVertex;
+			newVertex.id = neighbouring.c;
+			strcpy(newVertex.path[0], arcs[arcId].path);
+
+			intermediate[numIntermediate] = newVertex;
+			numIntermediate++;
 		}
 
 		i++;
+	}
+
+	traceVertex considerations[NUM_INT_VERTICES]; // Array of possible vertices
+
+	i = 0;
+	int numConsiderations = 0;
+
+	while (i < numIntermediate) {
+		trio neighbouring = getNeighbouringVertices(intermediate[i].id);
+
+		if (neighbouring.a >= 0 && vertices[neighbouring.a].object == VACANT_VERTEX) {
+			// Check that it's not within any other verticie
+			if (canBuildCampusOn(vertices, neighbouring.a)) {
+				int arcId = getArcIdFromVertices(intermediate[i].id , neighbouring.a);
+
+				traceVertex newVertex = intermediate[i];
+				strcpy(newVertex.path[1], arcs[arcId].path);
+
+				considerations[numConsiderations] = newVertex;
+				numConsiderations++;
+			}
+		}
+
+		if (neighbouring.b >= 0 && vertices[neighbouring.b].object == VACANT_VERTEX) {
+			// Check that it's not within any other verticie
+			if (canBuildCampusOn(vertices, neighbouring.b)) {
+				int arcId = getArcIdFromVertices(intermediate[i].id , neighbouring.b);
+
+				traceVertex newVertex = intermediate[i];
+				strcpy(newVertex.path[1], arcs[arcId].path);
+
+				considerations[numConsiderations] = newVertex;
+				numConsiderations++;
+			}
+		}
+
+		if (neighbouring.c >= 0 && vertices[neighbouring.c].object == VACANT_VERTEX) {
+			// Check that it's not within any other verticie
+			if (canBuildCampusOn(vertices, neighbouring.c)) {
+				int arcId = getArcIdFromVertices(intermediate[i].id , neighbouring.c);
+
+				traceVertex newVertex = intermediate[i];
+				strcpy(newVertex.path[1], arcs[arcId].path);
+
+				considerations[numConsiderations] = newVertex;
+				numConsiderations++;
+			}
+		}
 	}
 
 	printf("Determined considerations\n");
@@ -820,7 +901,7 @@ action decideAction(Game g) {
 			consideration[i]);
 		weightedVertex newVertex;
 		newVertex.weight = weight;
-		newVertex.vertexId = consideration[i];
+		newVertex.originVertex = consideration[i];
 
 		sortedWeights[i] = newVertex;
 
@@ -837,7 +918,7 @@ action decideAction(Game g) {
 
 	while (attempt < numConsiderations &&
 		enoughToBuildCampus(g, currentPlayer)) {
-		int vertexId = sortedWeights[attempt].vertexId;
+		int vertexId = sortedWeights[attempt].originVertex.id;
 
 		trio neighbours = getNeighbouringVertices(vertexId);
 
