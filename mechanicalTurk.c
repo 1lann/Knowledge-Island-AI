@@ -11,6 +11,7 @@
 #include <assert.h>
 #include <string.h>
 #include <math.h>
+#include <unistd.h>
 
 #include "Game.h"
 #include "mechanicalTurk.h"
@@ -66,11 +67,6 @@ typedef struct _vertex {
 	int disciplineC;
 } vertex;
 
-typedef struct _traceVertex {
-	int id;
-	char path[3][PATH_LIMIT];
-} traceVertex;
-
 typedef struct _arc {
 	int object;
 	char path[PATH_LIMIT];
@@ -87,8 +83,15 @@ typedef struct _trio {
 	int c;
 } trio;
 
+typedef struct _fromToArc {
+	int from;
+	int to;
+	int alreadyOwned;
+	int valid;
+} fromToArc;
+
 typedef struct _weightedVertex {
-	traceVertex originVertex;
+	fromToArc arcPath[2];
 	int weight;
 } weightedVertex;
 
@@ -344,6 +347,8 @@ pair getArcVertices(int arcId) {
 
 	arcPairs[0].b = 8;
 	arcPairs[7].b = 17;
+	arcPairs[16].a = -1;
+	arcPairs[16].b = -1;
 	arcPairs[27].b = 16;
 	arcPairs[38].b = 28;
 	arcPairs[47].b = 39;
@@ -684,13 +689,35 @@ void sortWeights(weightedVertex *list, int arraySize) {
 }
 
 
-int enoughToBuildCampus(Game g, int playerId) {
+int enoughToBuildCampus(Game g, int playerId, fromToArc arcPath[2]) {
 	int result = FALSE;
 
-	if (getStudents(g, playerId, STUDENT_BPS) >= 2 &&
-		getStudents(g, playerId, STUDENT_BQN) >= 2 &&
+	int pathResources = 2;
+
+	if (arcPath[0].alreadyOwned) {
+		pathResources--;
+	}
+
+	if (arcPath[1].alreadyOwned) {
+		pathResources--;
+	}
+
+	if (getStudents(g, playerId, STUDENT_BPS) >= pathResources &&
+		getStudents(g, playerId, STUDENT_BQN) >= pathResources &&
 		getStudents(g, playerId, STUDENT_MJ) >= 1 &&
 		getStudents(g, playerId, STUDENT_MTV) >= 1) {
+		result = TRUE;
+	}
+
+	return result;
+}
+
+
+int enoughToBuildPath(Game g, int playerId) {
+	int result = FALSE;
+
+	if (getStudents(g, playerId, STUDENT_BPS) >= 1 &&
+		getStudents(g, playerId, STUDENT_BQN) >= 1) {
 		result = TRUE;
 	}
 
@@ -761,7 +788,7 @@ action decideAction(Game g) {
 
 	printf("Populated database\n");
 
-	// If we have more than 10 campuses, plan for building GO8s
+	// If we have more than 5 campuses, plan for building GO8s
 	// If we have enough resources to build a GO8...
 	//    Upgrade the most valued campus to a GO8
 
@@ -799,10 +826,10 @@ action decideAction(Game g) {
 	// Now scan through each vertex and store neighbours
 
 	// Array of vertices that are accessible and aren't owned
-	traceVertex intermediate[NUM_INT_VERTICES];
+	fromToArc considerations[NUM_INT_VERTICES][2];
 
 	i = 0;
-	int numIntermediate = 0;
+	int numConsiderations = 0;
 
 	while (i < numMyVertices) {
 		trio neighbouring = getNeighbouringVertices(myVertices[i]);
@@ -810,81 +837,119 @@ action decideAction(Game g) {
 		if (neighbouring.a >= 0 && vertices[neighbouring.a].object == VACANT_VERTEX) {
 			int arcId = getArcIdFromVertices(myVertices[i], neighbouring.a);
 
-			traceVertex newVertex;
-			newVertex.id = neighbouring.a;
-			strcpy(newVertex.path[0], arcs[arcId].path);
+			if (arcs[arcId].object == VACANT_ARC || arcs[arcId].object == myARC) {
+				considerations[numConsiderations][0].from = myVertices[i];
+				considerations[numConsiderations][0].to = neighbouring.a;
+				considerations[numConsiderations][0].valid = TRUE;
 
-			intermediate[numIntermediate] = newVertex;
-			numIntermediate++;
+				if (arcs[arcId].object == myARC) {
+					considerations[numConsiderations][0].alreadyOwned = TRUE;
+				} else {
+					considerations[numConsiderations][0].alreadyOwned = FALSE;
+				}
+
+				numConsiderations++;
+			}
 		}
 		if (neighbouring.b >= 0 && vertices[neighbouring.b].object == VACANT_VERTEX) {
 			int arcId = getArcIdFromVertices(myVertices[i], neighbouring.b);
 
-			traceVertex newVertex;
-			newVertex.id = neighbouring.b;
-			strcpy(newVertex.path[0], arcs[arcId].path);
+			if (arcs[arcId].object == VACANT_ARC || arcs[arcId].object == myARC) {
+				considerations[numConsiderations][0].from = myVertices[i];
+				considerations[numConsiderations][0].to = neighbouring.b;
+				considerations[numConsiderations][0].valid = TRUE;
 
-			intermediate[numIntermediate] = newVertex;
-			numIntermediate++;
+				if (arcs[arcId].object == myARC) {
+					considerations[numConsiderations][0].alreadyOwned = TRUE;
+				} else {
+					considerations[numConsiderations][0].alreadyOwned = FALSE;
+				}
+
+				numConsiderations++;
+			}
 		}
 		if (neighbouring.c >= 0 && vertices[neighbouring.c].object == VACANT_VERTEX) {
 			int arcId = getArcIdFromVertices(myVertices[i], neighbouring.c);
 
-			traceVertex newVertex;
-			newVertex.id = neighbouring.c;
-			strcpy(newVertex.path[0], arcs[arcId].path);
+			if (arcs[arcId].object == VACANT_ARC || arcs[arcId].object == myARC) {
+				considerations[numConsiderations][0].from = myVertices[i];
+				considerations[numConsiderations][0].to = neighbouring.c;
 
-			intermediate[numIntermediate] = newVertex;
-			numIntermediate++;
+				if (arcs[arcId].object == myARC) {
+					considerations[numConsiderations][0].alreadyOwned = TRUE;
+				} else {
+					considerations[numConsiderations][0].alreadyOwned = FALSE;
+				}
+
+				numConsiderations++;
+			}
 		}
 
 		i++;
 	}
 
-	traceVertex consideration[NUM_INT_VERTICES]; // Array of possible vertices
-
 	i = 0;
-	int numConsiderations = 0;
 
-	while (i < numIntermediate) {
-		trio neighbouring = getNeighbouringVertices(intermediate[i].id);
+	while (i < numConsiderations) {
+		trio neighbouring = getNeighbouringVertices(considerations[i][0].to);
 
 		if (neighbouring.a >= 0 && vertices[neighbouring.a].object == VACANT_VERTEX) {
 			// Check that it's not within any other verticie
 			if (canBuildCampusOn(vertices, neighbouring.a)) {
-				int arcId = getArcIdFromVertices(intermediate[i].id , neighbouring.a);
+				int arcId = getArcIdFromVertices(considerations[i][0].to, neighbouring.a);
 
-				traceVertex newVertex = intermediate[i];
-				strcpy(newVertex.path[1], arcs[arcId].path);
+				if (arcs[arcId].object == VACANT_ARC || arcs[arcId].object == myARC) {
+					considerations[i][1].from = considerations[i][0].to;
+					considerations[i][1].to = neighbouring.a;
 
-				consideration[numConsiderations] = newVertex;
-				numConsiderations++;
+					if (arcs[arcId].object == myARC) {
+						considerations[i][0].alreadyOwned = TRUE;
+					} else {
+						considerations[i][0].alreadyOwned = FALSE;
+					}
+				}
+			} else {
+				considerations[i][0].valid = FALSE;
 			}
 		}
 
 		if (neighbouring.b >= 0 && vertices[neighbouring.b].object == VACANT_VERTEX) {
 			// Check that it's not within any other verticie
 			if (canBuildCampusOn(vertices, neighbouring.b)) {
-				int arcId = getArcIdFromVertices(intermediate[i].id , neighbouring.b);
+				int arcId = getArcIdFromVertices(considerations[i][0].to, neighbouring.b);
 
-				traceVertex newVertex = intermediate[i];
-				strcpy(newVertex.path[1], arcs[arcId].path);
+				if (arcs[arcId].object == VACANT_ARC || arcs[arcId].object == myARC) {
+					considerations[i][1].from = considerations[i][0].to;
+					considerations[i][1].to = neighbouring.b;
 
-				consideration[numConsiderations] = newVertex;
-				numConsiderations++;
+					if (arcs[arcId].object == myARC) {
+						considerations[i][0].alreadyOwned = TRUE;
+					} else {
+						considerations[i][0].alreadyOwned = FALSE;
+					}
+				}
+			} else {
+				considerations[i][0].valid = FALSE;
 			}
 		}
 
 		if (neighbouring.c >= 0 && vertices[neighbouring.c].object == VACANT_VERTEX) {
 			// Check that it's not within any other verticie
 			if (canBuildCampusOn(vertices, neighbouring.c)) {
-				int arcId = getArcIdFromVertices(intermediate[i].id , neighbouring.c);
+				int arcId = getArcIdFromVertices(considerations[i][0].to, neighbouring.c);
 
-				traceVertex newVertex = intermediate[i];
-				strcpy(newVertex.path[1], arcs[arcId].path);
+				if (arcs[arcId].object == VACANT_ARC || arcs[arcId].object == myARC) {
+					considerations[i][1].from = considerations[i][0].to;
+					considerations[i][1].to = neighbouring.c;
 
-				consideration[numConsiderations] = newVertex;
-				numConsiderations++;
+					if (arcs[arcId].object == myARC) {
+						considerations[i][0].alreadyOwned = TRUE;
+					} else {
+						considerations[i][0].alreadyOwned = FALSE;
+					}
+				}
+			} else {
+				considerations[i][0].valid = FALSE;
 			}
 		}
 
@@ -893,17 +958,66 @@ action decideAction(Game g) {
 
 	printf("Determined considerations\n");
 
-	// Now get the weight values of each consideration
-
-	weightedVertex sortedWeights[numConsiderations];
+	// Remove duplicate paths to the same vertex
 
 	i = 0;
+	int numPossibilities = 0;
+	fromToArc possibilities[NUM_INT_VERTICES][2];
+
 	while (i < numConsiderations) {
+		// First result dominates others, unless it has an alreadyOwned flag
+		if (considerations[i][0].valid) {
+			int search = considerations[i][1].to;
+
+			int j = 0;
+			int removeAll = FALSE;
+
+			possibilities[numPossibilities][0] = considerations[i][0];
+			possibilities[numPossibilities][1] = considerations[i][1];
+
+			while (j < numConsiderations) {
+				if (considerations[i][0].valid) {
+					if (considerations[i][1].to == search) {
+						// Same
+						if (!removeAll) {
+							if (considerations[i][0].alreadyOwned ||
+							considerations[i][1].alreadyOwned) {
+								// Better option
+								removeAll = TRUE;
+								considerations[i][0].valid = FALSE;
+
+								possibilities[numPossibilities][0] = considerations[j][0];
+								possibilities[numPossibilities][1] = considerations[j][1];
+								numPossibilities++;
+							}
+						}
+						considerations[j][0].valid = FALSE;
+					}
+				}
+
+				j++;
+			}
+
+			if (!removeAll) {
+				numPossibilities++;
+			}
+		}
+
+		i++;
+	}
+
+	// Now get the weight values of each consideration
+
+	weightedVertex sortedWeights[numPossibilities];
+
+	i = 0;
+	while (i < numPossibilities) {
 		int weight = getRecursiveVertexWeight(vertices, myVertices, numMyVertices,
-			consideration[i].id);
+			possibilities[i][1].to);
 		weightedVertex newVertex;
 		newVertex.weight = weight;
-		newVertex.originVertex = consideration[i];
+		newVertex.arcPath[0] = possibilities[i][0];
+		newVertex.arcPath[1] = possibilities[i][1];
 
 		sortedWeights[i] = newVertex;
 
@@ -919,48 +1033,73 @@ action decideAction(Game g) {
 	int attempt = 0;
 
 	while (attempt < numConsiderations &&
-		enoughToBuildCampus(g, currentPlayer)) {
-		int vertexId = sortedWeights[attempt].originVertex.id;
+		enoughToBuildCampus(g, currentPlayer, sortedWeights[attempt].arcPath)) {
+		int firstArc = getArcIdFromVertices(sortedWeights[attempt].arcPath[0].from,
+			sortedWeights[attempt].arcPath[0].to);
 
-		trio neighbours = getNeighbouringVertices(vertexId);
-
-		int i = 0;
-		int fromId = -1;
-		while (i < numMyVertices && fromId < 0) {
-			if (myVertices[i] == neighbours.a ||
-				myVertices[i] == neighbours.b ||
-				myVertices[i] == neighbours.c) {
-				fromId = myVertices[i];
-			}
-			i++;
-		}
-
-		int arcId = getArcIdFromVertices(vertexId, fromId);
-		if (arcId < 0) {
-			printf("Could not find path between %d and %d!\n", vertexId, fromId);
+		if (firstArc < 0) {
+			printf("Could not find path between %d and %d!\n",
+				sortedWeights[attempt].arcPath[0].from,
+				sortedWeights[attempt].arcPath[0].to);
 		} else {
-			action pathAction;
 
-			pathAction.actionCode = OBTAIN_ARC;
-			strcpy(pathAction.destination, arcs[arcId].path);
+			if (!sortedWeights[attempt].arcPath[0].alreadyOwned) {
+				action pathAction;
 
-			if (!isLegalAction(g, pathAction)) {
-				printf("ARC between %d and %d is not legal?\n", vertexId, fromId);
-			} else {
-				printf("Bought ARC between %d and %d\n", vertexId, fromId);
-				makeAction(g, pathAction);
+				pathAction.actionCode = OBTAIN_ARC;
+				strcpy(pathAction.destination, arcs[firstArc].path);
+
+				if (!isLegalAction(g, pathAction)) {
+					printf("ARC between %d and %d is not legal?\n",
+						sortedWeights[attempt].arcPath[0].from,
+						sortedWeights[attempt].arcPath[0].to);
+				} else {
+					printf("Bought ARC between %d and %d\n",
+					sortedWeights[attempt].arcPath[0].from,
+					sortedWeights[attempt].arcPath[0].to);
+					makeAction(g, pathAction);
+				}
 			}
 
-			action campusAction;
+			int secondArc = getArcIdFromVertices(sortedWeights[attempt].arcPath[1].from,
+				sortedWeights[attempt].arcPath[1].to);
 
-			strcpy(campusAction.destination, vertices[vertexId].path);
-			campusAction.actionCode = BUILD_CAMPUS;
-
-			if (!isLegalAction(g, campusAction)) {
-				printf("Campus at %d is not legal?\n", vertexId);
+			if (secondArc < 0) {
+				printf("Could not find path between %d and %d!\n",
+					sortedWeights[attempt].arcPath[1].from,
+					sortedWeights[attempt].arcPath[1].to);
 			} else {
-				printf("Built campus at %d\n", vertexId);
-				makeAction(g, campusAction);
+				if (!sortedWeights[attempt].arcPath[1].alreadyOwned) {
+					action pathAction;
+
+					pathAction.actionCode = OBTAIN_ARC;
+					strcpy(pathAction.destination, arcs[secondArc].path);
+
+					if (!isLegalAction(g, pathAction)) {
+						printf("ARC between %d and %d is not legal?\n",
+							sortedWeights[attempt].arcPath[1].from,
+							sortedWeights[attempt].arcPath[1].to);
+					} else {
+						printf("Bought ARC between %d and %d\n",
+						sortedWeights[attempt].arcPath[1].from,
+						sortedWeights[attempt].arcPath[1].to);
+						makeAction(g, pathAction);
+					}
+				}
+
+				int vertexId = sortedWeights[attempt].arcPath[1].to;
+
+				action campusAction;
+
+				strcpy(campusAction.destination, vertices[vertexId].path);
+				campusAction.actionCode = BUILD_CAMPUS;
+
+				if (!isLegalAction(g, campusAction)) {
+					printf("Campus at %d is not legal?\n", vertexId);
+				} else {
+					printf("Built campus at %d\n", vertexId);
+					makeAction(g, campusAction);
+				}
 			}
 		}
 
@@ -969,13 +1108,17 @@ action decideAction(Game g) {
 
 	printf("Campuses purchased\n");
 
+	printf("I have:\n");
+	printf("BPS: %d\n", getStudents(g, currentPlayer, STUDENT_BPS));
+	printf("BQN: %d\n", getStudents(g, currentPlayer, STUDENT_BQN));
+	printf("MJ: %d\n", getStudents(g, currentPlayer, STUDENT_MJ));
+	printf("MTV: %d\n", getStudents(g, currentPlayer, STUDENT_MTV));
+
 
 	// If there are any 3+ left over resources, start spin-offs. Check if legal.
 
 	// If there is an outlier resource with 7+ left over, exchange them to
 	// resource we have least have excluding THDs. Check if legal.
-
-
 
 	return nextAction;
 }
@@ -984,7 +1127,17 @@ int main() {
 	int defaultDis[] = DEFAULT_DISCIPLINES;
 	int defaultDice[] = DEFAULT_DICE;
 
+	srand(time(NULL));
+
 	Game thisGame = newGame(defaultDis, defaultDice);
-	throwDice(thisGame, 2);
-	action thisAction = decideAction(thisGame);
+	int i = 0;
+	while (TRUE) {
+		int r = rand();
+		throwDice(thisGame, (r % 11) + 2);
+		printf("\n------------------------------------\n");
+		printf("Turn #%d\n", i++);
+		printf("This is %d's turn\n", getWhoseTurn(thisGame));
+		action thisAction = decideAction(thisGame);
+		// usleep(1000000);
+	}
 }
