@@ -689,6 +689,21 @@ void sortWeights(weightedVertex *list, int arraySize) {
 	}
 }
 
+void convertStudents(Game g, int studentFrom, int studentTo, int numToCreate){
+	action a;
+	a.actionCode = RETRAIN_STUDENTS;
+	a.disciplineFrom = studentFrom;
+	a.disciplineTo = studentTo;
+
+	int i = 0;
+	while (i < numToCreate) {
+		if (isLegalAction(g, a)){
+			makeAction(g, a);
+		}
+		i++;
+	}
+	
+}
 
 int enoughToBuildCampus(Game g, int playerId, fromToArc arcPath[2]) {
 	int result = FALSE;
@@ -714,132 +729,72 @@ int enoughToBuildCampus(Game g, int playerId, fromToArc arcPath[2]) {
 	int numMTV = getStudents(g, playerId, STUDENT_MTV);
 
 	if (numMTV < 1){
-		if (numBPS - conRateMTV >= pathResources + 1){
-			action a;
-			a.actionCode = RETRAIN_STUDENTS;
-			a.disciplineFrom = STUDENT_BPS;
-			a.disciplineTo = STUDENT_MTV;
-			makeAction(g, a);
-
-			numBPS = numBPS - conRateMTV;
+		if (numBPS - conRateBPS >= pathResources + 1){
+			convertStudents(g, STUDENT_BPS, STUDENT_MTV, 1);
+			numBPS = numBPS - conRateBPS;
 			numMTV++;
-		} else if (numBQN - conRateMTV >= pathResources + 1) {
-			action a;
-			a.actionCode = RETRAIN_STUDENTS;
-			a.disciplineFrom = STUDENT_BQN;
-			a.disciplineTo = STUDENT_MTV;
-			makeAction(g, a);
-
-			numBQN = numBQN - conRateMTV;
+		} else if (numBQN - conRateBQN >= pathResources + 1) {
+			convertStudents(g, STUDENT_BQN, STUDENT_MTV, 1);
+			numBQN = numBQN - conRateBQN;
 			numMTV++;
-		} else if (numMJ - conRateMTV >= 1){
-			action a;
-			a.actionCode = RETRAIN_STUDENTS;
-			a.disciplineFrom = STUDENT_MTV;
-			a.disciplineTo = STUDENT_MTV;
-			makeAction(g, a);
-
-			numMJ = numMJ - conRateMTV;
+		} else if (numMJ - conRateMJ >= 1){
+			convertStudents(g, STUDENT_MJ, STUDENT_MTV, 1);
+			numMJ = numMJ - conRateMJ;
 			numMTV++;
 		}
 	}
 
 	if (numMJ < 1){
-		if (numBPS - conRateMJ >= pathResources + 1){
-			action a;
-			a.actionCode = RETRAIN_STUDENTS;
-			a.disciplineFrom = STUDENT_BPS;
-			a.disciplineTo = STUDENT_MJ;
-			makeAction(g, a);
-
-			numBPS = numBPS - conRateMJ;
+		if (numBPS - conRateBPS >= pathResources + 1){
+			convertStudents(g, STUDENT_BPS, STUDENT_MJ, 1);
+			numBPS = numBPS - conRateBPS;
 			numMJ++;
 		}
-		else if (numBQN - conRateMJ >= pathResources + 1) {
-			action a;
-			a.actionCode = RETRAIN_STUDENTS;
-			a.disciplineFrom = STUDENT_BQN;
-			a.disciplineTo = STUDENT_MJ;
-			makeAction(g, a);
-
-			numBQN = numBQN - conRateMJ;
+		else if (numBQN - conRateBQN >= pathResources + 1) {
+			convertStudents(g, STUDENT_BQN, STUDENT_MJ, 1);
+			numBQN = numBQN - conRateBQN;
 			numMJ++;
 		}
-		else if (numMTV - conRateMJ >= 1){
-			action a;
-			a.actionCode = RETRAIN_STUDENTS;
-			a.disciplineFrom = STUDENT_MTV;
-			a.disciplineTo = STUDENT_MJ;
-			makeAction(g, a);
-
-			numMTV = numMTV - conRateMJ;
+		else if (numMTV - conRateMTV >= 1){
+			convertStudents(g, STUDENT_MTV, STUDENT_MJ, 1);
+			numMTV = numMTV - conRateMTV;
 			numMJ++;
 		}
 	}
 	
 	if (numBQN <= pathResources + 1){
-		if (numBPS - conRateBQN >= pathResources + 1){
-			action a;
-			a.actionCode = RETRAIN_STUDENTS;
-			a.disciplineFrom = STUDENT_BPS;
-			a.disciplineTo = STUDENT_BQN;
-			makeAction(g, a);
-
-			numBPS = numBPS - conRateBQN;
-			numBQN++;
+		int neededBQN = pathResources + 1 - numBQN;
+		if (numBPS - (conRateBPS * (pathResources + 1)) >= pathResources + 1){
+			convertStudents(g, STUDENT_BPS, STUDENT_BQN, neededBQN);
+			numBPS = numBPS - (conRateBPS * (pathResources + 1));
+			numBQN += neededBQN;
 		}
-		else if (numMJ - conRateBQN >= 1) {
-			action a;
-			a.actionCode = RETRAIN_STUDENTS;
-			a.disciplineFrom = STUDENT_MJ;
-			a.disciplineTo = STUDENT_BQN;
-			makeAction(g, a);
-
-			numMJ = numMJ - conRateBQN;
-			numBQN++;
+		else if (numMJ - (conRateMJ * (pathResources + 1)) >= 1) {
+			convertStudents(g, STUDENT_MJ, STUDENT_BQN, neededBQN);
+			numMJ = numMJ - (conRateBQN * (pathResources + 1));
+			numBQN += neededBQN;
 		}
-		else if (numMTV - conRateBQN >= 1){
-			action a;
-			a.actionCode = RETRAIN_STUDENTS;
-			a.disciplineFrom = STUDENT_MTV;
-			a.disciplineTo = STUDENT_BQN;
-			makeAction(g, a);
-
-			numMTV = numMTV - conRateBQN;
-			numBQN++;
+		else if (numMTV - (conRateMTV * (pathResources + 1)) >= 1){
+			convertStudents(g, STUDENT_MTV, STUDENT_BQN, neededBQN);
+			numMTV = numMTV - (conRateBQN * (pathResources + 1));
+			numBQN += neededBQN;
 		}
 	}
 
 	if (numBPS >= pathResources + 1){
-		if (numBQN - conRateBPS >= pathResources + 1){
-			action a;
-			a.actionCode = RETRAIN_STUDENTS;
-			a.disciplineFrom = STUDENT_BQN;
-			a.disciplineTo = STUDENT_BPS;
-			makeAction(g, a);
-
-			numBQN = numBQN - conRateBPS;
-			numBPS++;
-		}
-		else if (numMJ - conRateBPS >= 1) {
-			action a;
-			a.actionCode = RETRAIN_STUDENTS;
-			a.disciplineFrom = STUDENT_MJ;
-			a.disciplineTo = STUDENT_BPS;
-			makeAction(g, a);
-
-			numMJ = numMJ - conRateBPS;
-			numBPS++;
-		}
-		else if (numMTV - conRateBPS >= 1){
-			action a;
-			a.actionCode = RETRAIN_STUDENTS;
-			a.disciplineFrom = STUDENT_MTV;
-			a.disciplineTo = STUDENT_BPS;
-			makeAction(g, a);
-
-			numMTV = numMTV - conRateBPS;
-			numBPS++;
+		int neededBPS = pathResources + 1 - numBPS;
+		if (numBQN - (conRateBQN * (pathResources + 1)) >= pathResources + 1){
+			convertStudents(g, STUDENT_BQN, STUDENT_BPS, neededBPS);
+			numBQN = numBQN - (conRateBQN * (pathResources + 1));
+			numBPS += neededBPS;
+		} else if (numMJ - (conRateBPS * (pathResources + 1)) >= 1) {
+			convertStudents(g, STUDENT_BQN, STUDENT_BPS, neededBPS);
+			numMJ = numMJ - (conRateMJ * (pathResources + 1));
+			numBPS += neededBPS;
+		} else if (numMTV - (conRateBPS * (pathResources + 1)) >= 1){
+			convertStudents(g, STUDENT_BQN, STUDENT_BPS, neededBPS);
+			numMTV = numMTV - (conRateMTV * (pathResources + 1));
+			numBPS += neededBPS;
 		}
 	}
 
