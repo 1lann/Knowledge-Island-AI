@@ -11,7 +11,8 @@
 #include <assert.h>
 #include <string.h>
 #include <math.h>
-#include <unistd.h>
+//#include <unistd.h>
+#include <time.h>
 
 #include "Game.h"
 #include "mechanicalTurk.h"
@@ -702,8 +703,148 @@ int enoughToBuildCampus(Game g, int playerId, fromToArc arcPath[2]) {
 		pathResources--;
 	}
 
-	if (getStudents(g, playerId, STUDENT_BPS) >= pathResources &&
-		getStudents(g, playerId, STUDENT_BQN) >= pathResources &&
+	int conRateBPS = (g, playerId, STUDENT_BPS, STUDENT_BPS);
+	int conRateBQN = (g, playerId, STUDENT_BPS, STUDENT_BQN);
+	int conRateMJ = (g, playerId, STUDENT_BPS, STUDENT_MJ);
+	int conRateMTV = (g, playerId, STUDENT_BPS, STUDENT_MTV);
+
+	int numBPS = getStudents(g, playerId, STUDENT_BPS);
+	int numBQN = getStudents(g, playerId, STUDENT_BQN);
+	int numMJ = getStudents(g, playerId, STUDENT_MJ);
+	int numMTV = getStudents(g, playerId, STUDENT_MTV);
+
+	if (numMTV < 1){
+		if (numBPS - conRateMTV >= pathResources + 1){
+			action a;
+			a.actionCode = RETRAIN_STUDENTS;
+			a.disciplineFrom = STUDENT_BPS;
+			a.disciplineTo = STUDENT_MTV;
+			makeAction(g, a);
+
+			numBPS = numBPS - conRateMTV;
+			numMTV++;
+		} else if (numBQN - conRateMTV >= pathResources + 1) {
+			action a;
+			a.actionCode = RETRAIN_STUDENTS;
+			a.disciplineFrom = STUDENT_BQN;
+			a.disciplineTo = STUDENT_MTV;
+			makeAction(g, a);
+
+			numBQN = numBQN - conRateMTV;
+			numMTV++;
+		} else if (numMJ - conRateMTV >= 1){
+			action a;
+			a.actionCode = RETRAIN_STUDENTS;
+			a.disciplineFrom = STUDENT_MTV;
+			a.disciplineTo = STUDENT_MTV;
+			makeAction(g, a);
+
+			numMJ = numMJ - conRateMTV;
+			numMTV++;
+		}
+	}
+
+	if (numMJ < 1){
+		if (numBPS - conRateMJ >= pathResources + 1){
+			action a;
+			a.actionCode = RETRAIN_STUDENTS;
+			a.disciplineFrom = STUDENT_BPS;
+			a.disciplineTo = STUDENT_MJ;
+			makeAction(g, a);
+
+			numBPS = numBPS - conRateMJ;
+			numMJ++;
+		}
+		else if (numBQN - conRateMJ >= pathResources + 1) {
+			action a;
+			a.actionCode = RETRAIN_STUDENTS;
+			a.disciplineFrom = STUDENT_BQN;
+			a.disciplineTo = STUDENT_MJ;
+			makeAction(g, a);
+
+			numBQN = numBQN - conRateMJ;
+			numMJ++;
+		}
+		else if (numMTV - conRateMJ >= 1){
+			action a;
+			a.actionCode = RETRAIN_STUDENTS;
+			a.disciplineFrom = STUDENT_MTV;
+			a.disciplineTo = STUDENT_MJ;
+			makeAction(g, a);
+
+			numMTV = numMTV - conRateMJ;
+			numMJ++;
+		}
+	}
+	
+	if (numBQN <= pathResources + 1){
+		if (numBPS - conRateBQN >= pathResources + 1){
+			action a;
+			a.actionCode = RETRAIN_STUDENTS;
+			a.disciplineFrom = STUDENT_BPS;
+			a.disciplineTo = STUDENT_BQN;
+			makeAction(g, a);
+
+			numBPS = numBPS - conRateBQN;
+			numBQN++;
+		}
+		else if (numMJ - conRateBQN >= 1) {
+			action a;
+			a.actionCode = RETRAIN_STUDENTS;
+			a.disciplineFrom = STUDENT_MJ;
+			a.disciplineTo = STUDENT_BQN;
+			makeAction(g, a);
+
+			numMJ = numMJ - conRateBQN;
+			numBQN++;
+		}
+		else if (numMTV - conRateBQN >= 1){
+			action a;
+			a.actionCode = RETRAIN_STUDENTS;
+			a.disciplineFrom = STUDENT_MTV;
+			a.disciplineTo = STUDENT_BQN;
+			makeAction(g, a);
+
+			numMTV = numMTV - conRateBQN;
+			numBQN++;
+		}
+	}
+
+	if (numBPS >= pathResources + 1){
+		if (numBQN - conRateBPS >= pathResources + 1){
+			action a;
+			a.actionCode = RETRAIN_STUDENTS;
+			a.disciplineFrom = STUDENT_BQN;
+			a.disciplineTo = STUDENT_BPS;
+			makeAction(g, a);
+
+			numBQN = numBQN - conRateBPS;
+			numBPS++;
+		}
+		else if (numMJ - conRateBPS >= 1) {
+			action a;
+			a.actionCode = RETRAIN_STUDENTS;
+			a.disciplineFrom = STUDENT_MJ;
+			a.disciplineTo = STUDENT_BPS;
+			makeAction(g, a);
+
+			numMJ = numMJ - conRateBPS;
+			numBPS++;
+		}
+		else if (numMTV - conRateBPS >= 1){
+			action a;
+			a.actionCode = RETRAIN_STUDENTS;
+			a.disciplineFrom = STUDENT_MTV;
+			a.disciplineTo = STUDENT_BPS;
+			makeAction(g, a);
+
+			numMTV = numMTV - conRateBPS;
+			numBPS++;
+		}
+	}
+
+	if (getStudents(g, playerId, STUDENT_BPS) >= pathResources + 1 &&
+		getStudents(g, playerId, STUDENT_BQN) >= pathResources + 1&&
 		getStudents(g, playerId, STUDENT_MJ) >= 1 &&
 		getStudents(g, playerId, STUDENT_MTV) >= 1) {
 		result = TRUE;
@@ -1008,7 +1149,8 @@ action decideAction(Game g) {
 
 	// Now get the weight values of each consideration
 
-	weightedVertex sortedWeights[numPossibilities];
+
+	weightedVertex sortedWeights[1];
 
 	i = 0;
 	while (i < numPossibilities) {
