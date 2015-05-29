@@ -11,7 +11,7 @@
 #include <assert.h>
 #include <string.h>
 #include <math.h>
-//#include <unistd.h>
+#include <unistd.h>
 #include <time.h>
 
 #include "Game.h"
@@ -45,7 +45,7 @@
 #define START_RIGHT_COLUMN {8, 17, 27, 38, 47}
 
 #define START_BRIDGE_LEFT {2, 9, 18, 30, 41}
-#define START_BRIDGE_RIGHT {10, 19, 29, 40, 44}
+#define START_BRIDGE_RIGHT {10, 19, 29, 40, 49}
 
 // Order: THD, BPS, BQN, MJ, MTV, MMONEY
 #define WEIGHTINGS {0, 30, 30, 50, 30, 40}
@@ -367,6 +367,9 @@ pair getArcVertices(int arcId) {
 		while (row < columnRows[column]) {
 			arcPairs[i].a = startLeft[column] + (row * 2);
 			arcPairs[i].b = startRight[column] + (row * 2);
+
+			// printf("Linking %d to %d\n", arcPairs[i].a, arcPairs[i].b);
+
 			row++;
 			i++;
 		}
@@ -402,7 +405,7 @@ trio getNeighbouringVertices(int vertexId) {
 	int resultsIterator = 0;
 	int i = 0;
 
-	while (i < NUM_INT_VERTICES) {
+	while (i < NUM_INT_ARCS) {
 		pair result = getArcVertices(i);
 
 		if (result.a == vertexId) {
@@ -416,25 +419,32 @@ trio getNeighbouringVertices(int vertexId) {
 		i++;
 	}
 
+	// printf("%d has the neighbours: ", vertexId);
+
 	trio resultTrio;
 
 	if (resultsIterator > 0) {
 		resultTrio.a = results[0];
+		// printf("%d, ", resultTrio.a);
 	} else {
 		resultTrio.a = -1;
 	}
 
 	if (resultsIterator > 1) {
 		resultTrio.b = results[1];
+		// printf("%d, ", resultTrio.b);
 	} else {
 		resultTrio.b = -1;
  	}
 
 	if (resultsIterator > 2) {
 		resultTrio.c = results[2];
+		// printf("%d, ", resultTrio.c);
 	} else {
 		resultTrio.c = -1;
 	}
+
+	// printf("\n");
 
 	return resultTrio;
 }
@@ -664,6 +674,12 @@ int canBuildCampusOn(vertex vertices[NUM_INT_VERTICES], int id) {
 		result = FALSE;
 	}
 
+	if (vertices[id].object != VACANT_VERTEX) {
+		result = FALSE;
+	}
+
+	// printf("Result for: %d is %d\n", id, result);
+
 	return result;
 }
 
@@ -677,9 +693,9 @@ void sortWeights(weightedVertex *list, int arraySize) {
 		int i = 1;
 		while (i < arraySize) {
 			if (list[i].weight > list[i - 1].weight) {
-				int newFirst = list[i - 1].weight;
-				list[i - 1].weight = list[i].weight;
-				list[i].weight = newFirst;
+				weightedVertex newFirst = list[i - 1];
+				list[i - 1] = list[i];
+				list[i] = newFirst;
 
 				changesMade = TRUE;
 			}
@@ -702,7 +718,7 @@ void convertStudents(Game g, int studentFrom, int studentTo, int numToCreate){
 		}
 		i++;
 	}
-	
+
 }
 
 int enoughToBuildCampus(Game g, int playerId, fromToArc arcPath[2]) {
@@ -718,18 +734,18 @@ int enoughToBuildCampus(Game g, int playerId, fromToArc arcPath[2]) {
 		pathResources--;
 	}
 
-	int conRateBPS = (g, playerId, STUDENT_BPS, STUDENT_BPS);
-	int conRateBQN = (g, playerId, STUDENT_BPS, STUDENT_BQN);
-	int conRateMJ = (g, playerId, STUDENT_BPS, STUDENT_MJ);
-	int conRateMTV = (g, playerId, STUDENT_BPS, STUDENT_MTV);
+	int conRateBPS = getExchangeRate(g, playerId, STUDENT_BPS, STUDENT_BPS);
+	int conRateBQN = getExchangeRate(g, playerId, STUDENT_BPS, STUDENT_BQN);
+	int conRateMJ = getExchangeRate(g, playerId, STUDENT_BPS, STUDENT_MJ);
+	int conRateMTV = getExchangeRate(g, playerId, STUDENT_BPS, STUDENT_MTV);
 
 	int numBPS = getStudents(g, playerId, STUDENT_BPS);
 	int numBQN = getStudents(g, playerId, STUDENT_BQN);
 	int numMJ = getStudents(g, playerId, STUDENT_MJ);
 	int numMTV = getStudents(g, playerId, STUDENT_MTV);
 
-	if (numMTV < 1){
-		if (numBPS - conRateBPS >= pathResources + 1){
+	if (numMTV < 1) {
+		if (numBPS - conRateBPS >= pathResources + 1) {
 			convertStudents(g, STUDENT_BPS, STUDENT_MTV, 1);
 			numBPS = numBPS - conRateBPS;
 			numMTV++;
@@ -737,15 +753,15 @@ int enoughToBuildCampus(Game g, int playerId, fromToArc arcPath[2]) {
 			convertStudents(g, STUDENT_BQN, STUDENT_MTV, 1);
 			numBQN = numBQN - conRateBQN;
 			numMTV++;
-		} else if (numMJ - conRateMJ >= 1){
+		} else if (numMJ - conRateMJ >= 1) {
 			convertStudents(g, STUDENT_MJ, STUDENT_MTV, 1);
 			numMJ = numMJ - conRateMJ;
 			numMTV++;
 		}
 	}
 
-	if (numMJ < 1){
-		if (numBPS - conRateBPS >= pathResources + 1){
+	if (numMJ < 1) {
+		if (numBPS - conRateBPS >= pathResources + 1) {
 			convertStudents(g, STUDENT_BPS, STUDENT_MJ, 1);
 			numBPS = numBPS - conRateBPS;
 			numMJ++;
@@ -755,16 +771,16 @@ int enoughToBuildCampus(Game g, int playerId, fromToArc arcPath[2]) {
 			numBQN = numBQN - conRateBQN;
 			numMJ++;
 		}
-		else if (numMTV - conRateMTV >= 1){
+		else if (numMTV - conRateMTV >= 1) {
 			convertStudents(g, STUDENT_MTV, STUDENT_MJ, 1);
 			numMTV = numMTV - conRateMTV;
 			numMJ++;
 		}
 	}
-	
-	if (numBQN <= pathResources + 1){
+
+	if (numBQN <= pathResources + 1) {
 		int neededBQN = pathResources + 1 - numBQN;
-		if (numBPS - (conRateBPS * (pathResources + 1)) >= pathResources + 1){
+		if (numBPS - (conRateBPS * (pathResources + 1)) >= pathResources + 1) {
 			convertStudents(g, STUDENT_BPS, STUDENT_BQN, neededBQN);
 			numBPS = numBPS - (conRateBPS * (pathResources + 1));
 			numBQN += neededBQN;
@@ -774,16 +790,16 @@ int enoughToBuildCampus(Game g, int playerId, fromToArc arcPath[2]) {
 			numMJ = numMJ - (conRateBQN * (pathResources + 1));
 			numBQN += neededBQN;
 		}
-		else if (numMTV - (conRateMTV * (pathResources + 1)) >= 1){
+		else if (numMTV - (conRateMTV * (pathResources + 1)) >= 1) {
 			convertStudents(g, STUDENT_MTV, STUDENT_BQN, neededBQN);
 			numMTV = numMTV - (conRateBQN * (pathResources + 1));
 			numBQN += neededBQN;
 		}
 	}
 
-	if (numBPS >= pathResources + 1){
+	if (numBPS <= pathResources + 1) {
 		int neededBPS = pathResources + 1 - numBPS;
-		if (numBQN - (conRateBQN * (pathResources + 1)) >= pathResources + 1){
+		if (numBQN - (conRateBQN * (pathResources + 1)) >= pathResources + 1) {
 			convertStudents(g, STUDENT_BQN, STUDENT_BPS, neededBPS);
 			numBQN = numBQN - (conRateBQN * (pathResources + 1));
 			numBPS += neededBPS;
@@ -791,7 +807,7 @@ int enoughToBuildCampus(Game g, int playerId, fromToArc arcPath[2]) {
 			convertStudents(g, STUDENT_BQN, STUDENT_BPS, neededBPS);
 			numMJ = numMJ - (conRateMJ * (pathResources + 1));
 			numBPS += neededBPS;
-		} else if (numMTV - (conRateBPS * (pathResources + 1)) >= 1){
+		} else if (numMTV - (conRateBPS * (pathResources + 1)) >= 1) {
 			convertStudents(g, STUDENT_BQN, STUDENT_BPS, neededBPS);
 			numMTV = numMTV - (conRateMTV * (pathResources + 1));
 			numBPS += neededBPS;
@@ -799,7 +815,7 @@ int enoughToBuildCampus(Game g, int playerId, fromToArc arcPath[2]) {
 	}
 
 	if (getStudents(g, playerId, STUDENT_BPS) >= pathResources + 1 &&
-		getStudents(g, playerId, STUDENT_BQN) >= pathResources + 1&&
+		getStudents(g, playerId, STUDENT_BQN) >= pathResources + 1 &&
 		getStudents(g, playerId, STUDENT_MJ) >= 1 &&
 		getStudents(g, playerId, STUDENT_MTV) >= 1) {
 		result = TRUE;
@@ -841,7 +857,7 @@ action decideAction(Game g) {
 	} else if (currentPlayer == UNI_B) {
 		myCampus = CAMPUS_B;
 		myGO8 = GO8_B;
-		myARC = ARC_C;
+		myARC = ARC_B;
 	} else if (currentPlayer == UNI_C) {
 		myCampus = CAMPUS_C;
 		myGO8 = GO8_C;
@@ -913,6 +929,7 @@ action decideAction(Game g) {
 		if (vertices[i].object == myCampus || vertices[i].object == myGO8) {
 			myVertices[numMyVertices] = i;
 			numMyVertices++;
+			// printf("%d\n", i);
 		}
 		i++;
 	}
@@ -988,8 +1005,10 @@ action decideAction(Game g) {
 
 	while (i < numConsiderations) {
 		trio neighbouring = getNeighbouringVertices(considerations[i][0].to);
+		int matched = FALSE;
 
 		if (neighbouring.a >= 0 && vertices[neighbouring.a].object == VACANT_VERTEX) {
+			matched = TRUE;
 			// Check that it's not within any other verticie
 			if (canBuildCampusOn(vertices, neighbouring.a)) {
 				int arcId = getArcIdFromVertices(considerations[i][0].to, neighbouring.a);
@@ -1010,6 +1029,7 @@ action decideAction(Game g) {
 		}
 
 		if (neighbouring.b >= 0 && vertices[neighbouring.b].object == VACANT_VERTEX) {
+			matched = TRUE;
 			// Check that it's not within any other verticie
 			if (canBuildCampusOn(vertices, neighbouring.b)) {
 				int arcId = getArcIdFromVertices(considerations[i][0].to, neighbouring.b);
@@ -1030,6 +1050,7 @@ action decideAction(Game g) {
 		}
 
 		if (neighbouring.c >= 0 && vertices[neighbouring.c].object == VACANT_VERTEX) {
+			matched = TRUE;
 			// Check that it's not within any other verticie
 			if (canBuildCampusOn(vertices, neighbouring.c)) {
 				int arcId = getArcIdFromVertices(considerations[i][0].to, neighbouring.c);
@@ -1049,6 +1070,10 @@ action decideAction(Game g) {
 			}
 		}
 
+		if (!matched) {
+			considerations[i][0].valid = FALSE;
+		}
+
 		i++;
 	}
 
@@ -1062,6 +1087,8 @@ action decideAction(Game g) {
 
 	while (i < numConsiderations) {
 		// First result dominates others, unless it has an alreadyOwned flag
+		// printf("%d: %d\n", i, considerations[i][1].to);
+
 		if (considerations[i][0].valid) {
 			int search = considerations[i][1].to;
 
@@ -1072,15 +1099,15 @@ action decideAction(Game g) {
 			possibilities[numPossibilities][1] = considerations[i][1];
 
 			while (j < numConsiderations) {
-				if (considerations[i][0].valid) {
-					if (considerations[i][1].to == search) {
+				if (considerations[j][0].valid) {
+					if (considerations[j][1].to == search) {
 						// Same
 						if (!removeAll) {
-							if (considerations[i][0].alreadyOwned ||
-							considerations[i][1].alreadyOwned) {
+							if (considerations[j][0].alreadyOwned ||
+							considerations[j][1].alreadyOwned) {
 								// Better option
 								removeAll = TRUE;
-								considerations[i][0].valid = FALSE;
+								considerations[j][0].valid = FALSE;
 
 								possibilities[numPossibilities][0] = considerations[j][0];
 								possibilities[numPossibilities][1] = considerations[j][1];
@@ -1121,7 +1148,7 @@ action decideAction(Game g) {
 		i++;
 	}
 
-	sortWeights(sortedWeights, numConsiderations);
+	sortWeights(sortedWeights, numPossibilities);
 
 	printf("Weighted considerations\n");
 
@@ -1129,7 +1156,7 @@ action decideAction(Game g) {
 
 	int attempt = 0;
 
-	while (attempt < numConsiderations &&
+	while (attempt < numPossibilities &&
 		enoughToBuildCampus(g, currentPlayer, sortedWeights[attempt].arcPath)) {
 		int firstArc = getArcIdFromVertices(sortedWeights[attempt].arcPath[0].from,
 			sortedWeights[attempt].arcPath[0].to);
@@ -1139,7 +1166,6 @@ action decideAction(Game g) {
 				sortedWeights[attempt].arcPath[0].from,
 				sortedWeights[attempt].arcPath[0].to);
 		} else {
-
 			if (!sortedWeights[attempt].arcPath[0].alreadyOwned) {
 				action pathAction;
 
@@ -1210,6 +1236,7 @@ action decideAction(Game g) {
 	printf("BQN: %d\n", getStudents(g, currentPlayer, STUDENT_BQN));
 	printf("MJ: %d\n", getStudents(g, currentPlayer, STUDENT_MJ));
 	printf("MTV: %d\n", getStudents(g, currentPlayer, STUDENT_MTV));
+	printf("Points: %d\n", getKPIpoints(g, currentPlayer));
 
 
 	// If there are any 3+ left over resources, start spin-offs. Check if legal.
@@ -1227,14 +1254,22 @@ int main() {
 	srand(time(NULL));
 
 	Game thisGame = newGame(defaultDis, defaultDice);
+
+	action passAction;
+	passAction.actionCode = PASS;
+
 	int i = 0;
-	while (TRUE) {
+	while (i < 1000) {
 		int r = rand();
-		throwDice(thisGame, (r % 11) + 2);
+		// throwDice(thisGame, (r % 11) + 2);
+		throwDice(thisGame, 9);
+		makeAction(thisGame, passAction);
+		throwDice(thisGame, 9);
 		printf("\n------------------------------------\n");
 		printf("Turn #%d\n", i++);
 		printf("This is %d's turn\n", getWhoseTurn(thisGame));
 		action thisAction = decideAction(thisGame);
-		// usleep(1000000);
+		throwDice(thisGame, 9);
+		makeAction(thisGame, passAction);
 	}
 }
