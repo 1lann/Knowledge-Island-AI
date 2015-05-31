@@ -450,7 +450,7 @@ trio getNeighbouringVertices(int vertexId) {
 
 
 // Returns the disciplines of surrounding hexes of a vertices
-trio getVertexHexes(int vertexId) {
+trio getVertexHexes(Game g, int vertexId) {
 	int results[3];
 	int resultI = 0;
 
@@ -489,7 +489,13 @@ trio getVertexHexes(int vertexId) {
 	}
 
 	trio resultTrio;
-	int allDisciplines[NUM_REGIONS] = DEFAULT_DISCIPLINES;
+	int allDisciplines[NUM_REGIONS];
+
+	int i = 0;
+	while (i < NUM_REGIONS) {
+		allDisciplines[i] = getDiscipline(g, i);
+		i++;
+	}
 
 	// printf("Hexes for %d: ", vertexId);
 
@@ -521,7 +527,7 @@ trio getVertexHexes(int vertexId) {
 
 
 // Gets value of vertex by itself
-int getSingleVertexWeight(vertex vertices[NUM_INT_VERTICES],
+int getSingleVertexWeight(Game g, vertex vertices[NUM_INT_VERTICES],
 	int myVertices[NUM_INT_VERTICES], int numMyVertices, int vertexId) {
 
 	int weights[NUM_DISCIPLINES] = WEIGHTINGS;
@@ -537,7 +543,7 @@ int getSingleVertexWeight(vertex vertices[NUM_INT_VERTICES],
 	i = 0;
 
 	while (i < numMyVertices) {
-		trio myHexes = getVertexHexes(myVertices[i]);
+		trio myHexes = getVertexHexes(g, myVertices[i]);
 
 		if (myHexes.a >= 0) {
 			subWeights[myHexes.a] += 1;
@@ -555,7 +561,7 @@ int getSingleVertexWeight(vertex vertices[NUM_INT_VERTICES],
 	}
 
 	int sum = 0;
-	trio hexes = getVertexHexes(vertexId);
+	trio hexes = getVertexHexes(g, vertexId);
 
 	if (hexes.a >= 0) {
 		sum += weights[hexes.a] - subWeights[hexes.a];
@@ -589,7 +595,7 @@ int alreadyOwnVertex(int myVertices[NUM_INT_VERTICES], int queryVertex) {
 }
 
 
-int getRecursiveVertexWeight(vertex vertices[NUM_INT_VERTICES],
+int getRecursiveVertexWeight(Game g, vertex vertices[NUM_INT_VERTICES],
 	int myVertices[NUM_INT_VERTICES], int numMyVertices, int vertexId) {
 
 	int layerQueue[SEARCH_DEPTH + 1][NUM_INT_VERTICES];
@@ -619,7 +625,7 @@ int getRecursiveVertexWeight(vertex vertices[NUM_INT_VERTICES],
 
 	seen[vertexId] = TRUE;
 
-	double sum = (double)getSingleVertexWeight(vertices,
+	double sum = (double)getSingleVertexWeight(g, vertices,
 		myVertices, numMyVertices, vertexId);
 
 	layer = 0;
@@ -636,7 +642,7 @@ int getRecursiveVertexWeight(vertex vertices[NUM_INT_VERTICES],
 				if (neighbours.a >= 0 && !seen[neighbours.a] &&
 					!alreadyOwnVertex(myVertices, neighbours.a)) {
 					layerQueue[layer + 1][queuePusher] = neighbours.a;
-					sum += (double)getSingleVertexWeight(vertices,
+					sum += (double)getSingleVertexWeight(g, vertices,
 						myVertices, numMyVertices, neighbours.a) *
 						pow(DEPTH_MULTIPLIER, layer);
 					queuePusher++;
@@ -645,7 +651,7 @@ int getRecursiveVertexWeight(vertex vertices[NUM_INT_VERTICES],
 				if (neighbours.b >= 0 && !seen[neighbours.b] &&
 					!alreadyOwnVertex(myVertices, neighbours.b)) {
 					layerQueue[layer + 1][queuePusher] = neighbours.b;
-					sum += (double)getSingleVertexWeight(vertices,
+					sum += (double)getSingleVertexWeight(g, vertices,
 						myVertices, numMyVertices, neighbours.b) *
 						pow(DEPTH_MULTIPLIER, layer);
 					queuePusher++;
@@ -654,14 +660,14 @@ int getRecursiveVertexWeight(vertex vertices[NUM_INT_VERTICES],
 				if (neighbours.c >= 0 && !seen[neighbours.c] &&
 					!alreadyOwnVertex(myVertices, neighbours.c)) {
 					layerQueue[layer + 1][queuePusher] = neighbours.c;
-					sum += (double)getSingleVertexWeight(vertices,
+					sum += (double)getSingleVertexWeight(g, vertices,
 						myVertices, numMyVertices, neighbours.c) *
 						pow(DEPTH_MULTIPLIER, layer);
 					queuePusher++;
 				}
-
-				i++;
 			}
+
+			i++;
 		}
 
 		layer++;
@@ -944,7 +950,7 @@ action decideAction(Game g) {
 		i++;
 	}
 
-	printf("Populated database\n");
+	// printf("Populated database\n");
 
 	// If we have more than 5 campuses, plan for building GO8s
 	// If we have enough resources to build a GO8...
@@ -980,7 +986,7 @@ action decideAction(Game g) {
 		i++;
 	}
 
-	printf("Found our vertices\n");
+	// printf("Found our vertices\n");
 
 	// Now scan through each vertex and store neighbours
 
@@ -1011,7 +1017,6 @@ action decideAction(Game g) {
 		}
 		if (neighbouring.b >= 0 && vertices[neighbouring.b].object == VACANT_VERTEX) {
 			int arcId = getArcIdFromVertices(myVertices[i], neighbouring.b);
-
 			if (arcs[arcId].object == VACANT_ARC || arcs[arcId].object == myARC) {
 				considerations[numConsiderations][0].from = myVertices[i];
 				considerations[numConsiderations][0].to = neighbouring.b;
@@ -1185,7 +1190,7 @@ action decideAction(Game g) {
 
 	i = 0;
 	while (i < numPossibilities) {
-		int weight = getRecursiveVertexWeight(vertices, myVertices, numMyVertices,
+		int weight = getRecursiveVertexWeight(g, vertices, myVertices, numMyVertices,
 			possibilities[i][1].to);
 		weightedVertex newVertex;
 		newVertex.weight = weight;
@@ -1199,7 +1204,7 @@ action decideAction(Game g) {
 
 	sortWeights(sortedWeights, numPossibilities);
 
-	printf("Weighted considerations\n");
+	// printf("Weighted considerations\n");
 
 	// Buy in order of weighting
 
@@ -1285,15 +1290,15 @@ action decideAction(Game g) {
 		attempt++;
 	}
 
-	printf("Campuses purchased\n");
+	// printf("Campuses purchased\n");
 
-	printf("I have:\n");
-	printf("THD: %d\n", getStudents(g, currentPlayer, STUDENT_THD));
-	printf("BPS: %d\n", getStudents(g, currentPlayer, STUDENT_BPS));
-	printf("BQN: %d\n", getStudents(g, currentPlayer, STUDENT_BQN));
-	printf("MJ: %d\n", getStudents(g, currentPlayer, STUDENT_MJ));
-	printf("MTV: %d\n", getStudents(g, currentPlayer, STUDENT_MTV));
-	printf("MMONEY: %d\n", getStudents(g, currentPlayer, STUDENT_MMONEY));
+	// printf("I have:\n");
+	// printf("THD: %d\n", getStudents(g, currentPlayer, STUDENT_THD));
+	// printf("BPS: %d\n", getStudents(g, currentPlayer, STUDENT_BPS));
+	// printf("BQN: %d\n", getStudents(g, currentPlayer, STUDENT_BQN));
+	// printf("MJ: %d\n", getStudents(g, currentPlayer, STUDENT_MJ));
+	// printf("MTV: %d\n", getStudents(g, currentPlayer, STUDENT_MTV));
+	// printf("MMONEY: %d\n", getStudents(g, currentPlayer, STUDENT_MMONEY));
 	printf("Points: %d\n", getKPIpoints(g, currentPlayer));
 
 
@@ -1317,14 +1322,14 @@ int main() {
 	passAction.actionCode = PASS;
 
 	int i = 0;
-	while (i < 9000) {
+	while (i < 100) {
 		int r = rand();
 		throwDice(thisGame, (r % 11) + 2);
 		// throwDice(thisGame, 9);
 		// makeAction(thisGame, passAction);
 		// throwDice(thisGame, 9);
-		printf("\n------------------------------------\n");
-		printf("Turn #%d\n", i++);
+		// printf("\n------------------------------------\n");
+		// printf("Turn #%d\n", i++);
 		printf("This is %d's turn\n", getWhoseTurn(thisGame));
 		action thisAction = decideAction(thisGame);
 		// throwDice(thisGame, 9);
