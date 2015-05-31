@@ -496,6 +496,61 @@ void convertStudents(Game g, int studentFrom, int studentTo, int numToCreate){
 
 }
 
+
+int enoughToBuildGO8(Game g, int playerId) {
+	int result = FALSE;
+
+	int changesMade = TRUE;
+
+	int conRateBPS = getExchangeRate(g, playerId, STUDENT_BPS, STUDENT_BPS);
+	int conRateBQN = getExchangeRate(g, playerId, STUDENT_BPS, STUDENT_BQN);
+	int conRateMTV = getExchangeRate(g, playerId, STUDENT_BPS, STUDENT_MTV);
+
+	int numRequiredMJ = 1;
+	int numRequiredMMONEY = 1;
+
+	while (changesMade && numRequiredMJ > 0 && numRequiredMMONEY > 0) {
+		int effectiveBPS = getStudents(g, playerId, STUDENT_BPS) / conRateBPS;
+		int effectiveBQN = getStudents(g, playerId, STUDENT_BQN) / conRateBQN;
+		int numMJ = getStudents(g, playerId, STUDENT_MJ);
+		int effectiveMTV = getStudents(g, playerId, STUDENT_MTV) / conRateMTV;
+		int numMMONEY = getStudents(g, playerId, STUDENT_MMONEY);
+
+		numRequiredMJ = 3 - numMJ;
+		numRequiredMMONEY = 3 - numMMONEY;
+
+		if (numRequiredMJ > 0 && numRequiredMMONEY > 0) {
+			int toSide;
+
+			if (numRequiredMJ < numRequiredMMONEY) {
+				toSide = STUDENT_MMONEY;
+			} else {
+				toSide = STUDENT_MJ;
+			}
+
+			changesMade = FALSE;
+
+			if (effectiveBPS > 0) {
+				changesMade = TRUE;
+				convertStudents(g, STUDENT_BPS, toSide, 1);
+			} else if (effectiveBQN > 0) {
+				changesMade = TRUE;
+				convertStudents(g, STUDENT_BQN, toSide, 1);
+			} else if (effectiveMTV > 0) {
+				changesMade = TRUE;
+				convertStudents(g, STUDENT_MTV, toSide, 1);
+			}
+		}
+	}
+
+	if (numRequiredMMONEY < 1 && numRequiredMJ < 1) {
+		result = TRUE;
+	}
+
+	return result;
+}
+
+
 int enoughToBuildCampus(Game g, int playerId, fromToArc arcPath[2]) {
 	int result = FALSE;
 
@@ -977,6 +1032,73 @@ action decideAction(Game g) {
 	// }
 
 	int attempt = 0;
+	int domination = FALSE;
+
+	if (numPossibilities == 0) {
+		printf("Reached domination\n");
+		domination = TRUE;
+	}
+
+	int GO8domination = FALSE;
+
+	if (domination) {
+		// Build GO8s
+		weightedVertex sortedMyCampuses[numMyVertices];
+		int numMyCampuses = 0;
+
+		i = 0;
+		while (i < numMyVertices) {
+			if (vertices[myVertices[i]].object == myCampus) {
+				int weight = getSingleVertexWeight(g, vertices, myVertices,
+					numMyVertices, myVertices[i]);
+				weightedVertex newVertex;
+				newVertex.weight = weight;
+
+				fromToArc newDestination;
+				newDestination.to = myVertices[i];
+				newVertex.arcPath[0] = newDestination;
+
+				sortedMyCampuses[numMyCampuses] = newVertex;
+
+				numMyCampuses++;
+			}
+
+			i++;
+		}
+
+		sortWeights(sortedMyCampuses, numMyCampuses);
+
+		if (numMyCampuses == 0 || getGO8s(g, currentPlayer) >= 8) {
+			printf("GO8 Domiation\n");
+			GO8domination = TRUE;
+		}
+
+		i = 0;
+		while (i < numMyCampuses) {
+			if (enoughToBuildGO8(g, currentPlayer)) {
+				action go8Action;
+				go8Action.actionCode = BUILD_GO8;
+
+				strcpy(go8Action.destination,
+					vertices[sortedMyCampuses[i].arcPath[0].to].path);
+
+				if (isLegalAction(g, go8Action)) {
+					makeAction(g, go8Action);
+					printf("Built GO8 at %d\n",
+						sortedMyCampuses[i].arcPath[0].to);
+				} else {
+					printf("Could not build GO8 at %d\n",
+						sortedMyCampuses[i].arcPath[0].to);
+				}
+			}
+
+			i++;
+		}
+	}
+
+	if (GO8domination) {
+		// Wow pls, make spinoffs
+	}
 
 	while (attempt < numPossibilities &&
 		enoughToBuildCampus(g, currentPlayer, sortedWeights[attempt].arcPath)) {
@@ -1053,13 +1175,13 @@ action decideAction(Game g) {
 
 	// printf("Campuses purchased\n");
 
-	// printf("I have:\n");
-	// printf("THD: %d\n", getStudents(g, currentPlayer, STUDENT_THD));
-	// printf("BPS: %d\n", getStudents(g, currentPlayer, STUDENT_BPS));
-	// printf("BQN: %d\n", getStudents(g, currentPlayer, STUDENT_BQN));
-	// printf("MJ: %d\n", getStudents(g, currentPlayer, STUDENT_MJ));
-	// printf("MTV: %d\n", getStudents(g, currentPlayer, STUDENT_MTV));
-	// printf("MMONEY: %d\n", getStudents(g, currentPlayer, STUDENT_MMONEY));
+	printf("I have:\n");
+	printf("THD: %d\n", getStudents(g, currentPlayer, STUDENT_THD));
+	printf("BPS: %d\n", getStudents(g, currentPlayer, STUDENT_BPS));
+	printf("BQN: %d\n", getStudents(g, currentPlayer, STUDENT_BQN));
+	printf("MJ: %d\n", getStudents(g, currentPlayer, STUDENT_MJ));
+	printf("MTV: %d\n", getStudents(g, currentPlayer, STUDENT_MTV));
+	printf("MMONEY: %d\n", getStudents(g, currentPlayer, STUDENT_MMONEY));
 	printf("Points: %d\n", getKPIpoints(g, currentPlayer));
 
 
@@ -1071,36 +1193,36 @@ action decideAction(Game g) {
 	return nextAction;
 }
 
-// int main() {
-// 	int defaultDis[] = DEFAULT_DISCIPLINES;
-// 	int defaultDice[] = DEFAULT_DICE;
+int main() {
+	int defaultDis[] = DEFAULT_DISCIPLINES;
+	int defaultDice[] = DEFAULT_DICE;
 
-// 	srand(time(NULL));
+	srand(time(NULL));
 
-// 	Game thisGame = newGame(defaultDis, defaultDice);
+	Game thisGame = newGame(defaultDis, defaultDice);
 
-// 	action passAction;
-// 	passAction.actionCode = PASS;
+	action passAction;
+	passAction.actionCode = PASS;
 
-// 	int i = 0;
-// 	while (i < 100) {
-// 		int r = rand();
-// 		throwDice(thisGame, (r % 11) + 2);
-// 		// throwDice(thisGame, 9);
-// 		// makeAction(thisGame, passAction);
-// 		// throwDice(thisGame, 9);
-// 		// printf("\n------------------------------------\n");
-// 		// printf("Turn #%d\n", i++);
-// 		printf("This is %d's turn\n", getWhoseTurn(thisGame));
-// 		action thisAction = decideAction(thisGame);
-// 		// throwDice(thisGame, 9);
-// 		makeAction(thisGame, thisAction);
-// 		// throwDice(thisGame, (r % 11) + 2);
-// 		// makeAction(thisGame, passAction);
-// 		// throwDice(thisGame, (r % 11) + 2);
-// 		// makeAction(thisGame, passAction);
-// 		usleep(1);
-// 	}
+	int i = 0;
+	while (i < 500) {
+		int r = rand();
+		throwDice(thisGame, (r % 11) + 2);
+		// throwDice(thisGame, 9);
+		// makeAction(thisGame, passAction);
+		// throwDice(thisGame, 9);
+		printf("\n------------------------------------\n");
+		printf("Turn #%d\n", i++);
+		printf("This is %d's turn\n", getWhoseTurn(thisGame));
+		action thisAction = decideAction(thisGame);
+		// throwDice(thisGame, 9);
+		makeAction(thisGame, thisAction);
+		throwDice(thisGame, (r % 11) + 2);
+		makeAction(thisGame, passAction);
+		throwDice(thisGame, (r % 11) + 2);
+		makeAction(thisGame, passAction);
+		usleep(1);
+	}
 
-// 	return EXIT_SUCCESS;
-// }
+	return EXIT_SUCCESS;
+}
