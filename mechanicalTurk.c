@@ -1,10 +1,6 @@
-/*
-*  Mr Pass.  Brain the size of a planet!
-*
-*  Proundly Created by Richard Buckland
-*  Share Freely Creative Commons SA-BY-NC 3.0.
-*
-*/
+//
+// Mechanical Turk by Jason Chu and Alex Shearer
+//
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -94,241 +90,6 @@ typedef struct _weightedVertex {
 	fromToArc arcPath[2];
 	int weight;
 } weightedVertex;
-
-//
-// The Mapping and Pathing Engine
-//
-
-int getColumnNum(int position) {
-	int columnNum = -1;
-
-	if (position >= 0 && position <= 6) {
-		columnNum = 0;
-	} else if (position >= 7 && position <= 15) {
-		columnNum = 1;
-	} else if (position >= 16 && position <= 26) {
-		columnNum = 2;
-	} else if (position >= 27 && position <= 37) {
-		columnNum = 3;
-	} else if (position >= 38 && position <= 46) {
-		columnNum = 4;
-	} else if (position >= 47 && position <= 53) {
-		columnNum = 5;
-	}
-
-	return columnNum;
-}
-
-
-int verifySameColumn(int first, int second) {
-	int ok = FALSE;
-
-	if (getColumnNum(first) == getColumnNum(second)) {
-		ok = TRUE;
-	}
-
-	return ok;
-}
-
-
-int getJumpRightConversion(int position) {
-	int conversion = 0;
-
-	int column = getColumnNum(position);
-
-	if (column == 0) {
-		conversion = 8;
-	} else if (column == 1) {
-		conversion = 10;
-	} else if (column == 2) {
-		conversion = 11;
-	} else if (column == 3) {
-		conversion = 10;
-	} else if (column == 4) {
-		conversion = 8;
-	} else if (column == 5) {
-		conversion = 100;
-	}
-
-	return conversion;
-}
-
-
-int getJumpLeftConversion(int position) {
-	int conversion = 0;
-
-	int column = getColumnNum(position);
-
-	if (column == 0) {
-		conversion = -100;
-	} else if (column == 1) {
-		conversion = -8;
-	} else if (column == 2) {
-		conversion = -10;
-	} else if (column == 3) {
-		conversion = -11;
-	} else if (column == 4) {
-		conversion = -10;
-	} else if (column == 5) {
-		conversion = -8;
-	}
-
-	return conversion;
-}
-
-
-// Whether you can jump to the right at a position
-int canJumpRight(int position) {
-	int result = FALSE;
-
-	int column = getColumnNum(position);
-
-	if (column == 0 || column == 2 || column == 3 || column == 5) {
-		if (position % 2 == 0) {
-			result = TRUE;
-		} else {
-			result = FALSE;
-		}
-	} else if (column == 1 || column == 4) {
-		if (position % 2 == 0) {
-			result = FALSE;
-		} else {
-			result = TRUE;
-		}
-	}
-
-	return result;
-}
-
-
-int positionBackFrom(int position, int relativeTo) {
-	return relativeTo;
-}
-
-
-int positionLeftFrom(int position, int relativeTo) {
-	int result = 0;
-	int sameColumn = FALSE;
-
-	if (relativeTo - position == 1) {
-		// We are moving up the column
-		if (canJumpRight(position)) {
-			// You can move right, so on the left, you move up
-			result = position - 1;
-			sameColumn = TRUE;
-		} else {
-			// You can move left, so you jump
-			result = position + getJumpLeftConversion(position);
-		}
-
-	} else if (relativeTo - position == -1) {
-		// We are moving down the column
-		if (canJumpRight(position)) {
-			result = position + getJumpRightConversion(position);
-		} else {
-			result = position + 1;
-			sameColumn = TRUE;
-		}
-
-	} else if (relativeTo < position) {
-		// Moving left to right
-		result = position - 1;
-		sameColumn = TRUE;
-
-	} else if (relativeTo > position) {
-		// Moving right to left
-		result = position + 1;
-		sameColumn = TRUE;
-	}
-
-	if (sameColumn && !verifySameColumn(position, result)) {
-		result = -100;
-	}
-
-	return result;
-}
-
-
-int positionRightFrom(int position, int relativeTo) {
-	int result = 0;
-	int sameColumn = FALSE;
-
-	if (relativeTo - position == 1) {
-		// We are moving up the column
-		if (canJumpRight(position)) {
-			// You can move right
-			result = position + getJumpRightConversion(position);
-		} else {
-			// You can move left, so you jump
-			result = position - 1;
-			sameColumn = TRUE;
-		}
-
-	} else if (relativeTo - position == -1) {
-		// We are moving down the column
-		if (canJumpRight(position)) {
-			result = position + 1;
-			sameColumn = TRUE;
-		} else {
-			result = position + getJumpLeftConversion(position);
-		}
-
-	} else if (relativeTo < position) {
-		// Moving left to right
-		result = position + 1;
-		sameColumn = TRUE;
-
-	} else if (relativeTo > position) {
-		// Moving right to left
-		result = position - 1;
-		sameColumn = TRUE;
-	}
-
-	if (sameColumn && !verifySameColumn(position, result)) {
-		result = -100;
-	}
-
-	return result;
-}
-
-
-// Converts a path into a vertex position.
-int pathToPosition(path p) {
-	int pathLen = strlen(p);
-
-	int lastPosition = 16;
-	int currentPosition = -1;
-
-	int i = 0;
-	if (p[i] == 'L') {
-		currentPosition = 27;
-	} else if (p[i] == 'R') {
-		currentPosition = 17;
-	} else if (p[i] == 'B') {
-		currentPosition = -1;
-	}
-
-	i++;
-
-	while (i < pathLen && currentPosition >= 0 && currentPosition < NUM_INT_VERTICES) {
-		char instruction = p[i];
-		int lastLastPosition = currentPosition;
-
-		if (instruction == 'L') {
-			currentPosition = positionLeftFrom(currentPosition, lastPosition);
-		} else if (instruction == 'R') {
-			currentPosition = positionRightFrom(currentPosition, lastPosition);
-		} else if (instruction == 'B') {
-			currentPosition = positionBackFrom(currentPosition, lastPosition);
-		}
-
-		lastPosition = lastLastPosition;
-
-		i++;
-	}
-
-	return currentPosition;
-}
 
 
 // Get connecting vertices of an arc
@@ -1310,36 +1071,36 @@ action decideAction(Game g) {
 	return nextAction;
 }
 
-int main() {
-	int defaultDis[] = DEFAULT_DISCIPLINES;
-	int defaultDice[] = DEFAULT_DICE;
+// int main() {
+// 	int defaultDis[] = DEFAULT_DISCIPLINES;
+// 	int defaultDice[] = DEFAULT_DICE;
 
-	srand(time(NULL));
+// 	srand(time(NULL));
 
-	Game thisGame = newGame(defaultDis, defaultDice);
+// 	Game thisGame = newGame(defaultDis, defaultDice);
 
-	action passAction;
-	passAction.actionCode = PASS;
+// 	action passAction;
+// 	passAction.actionCode = PASS;
 
-	int i = 0;
-	while (i < 100) {
-		int r = rand();
-		throwDice(thisGame, (r % 11) + 2);
-		// throwDice(thisGame, 9);
-		// makeAction(thisGame, passAction);
-		// throwDice(thisGame, 9);
-		// printf("\n------------------------------------\n");
-		// printf("Turn #%d\n", i++);
-		printf("This is %d's turn\n", getWhoseTurn(thisGame));
-		action thisAction = decideAction(thisGame);
-		// throwDice(thisGame, 9);
-		makeAction(thisGame, thisAction);
-		// throwDice(thisGame, (r % 11) + 2);
-		// makeAction(thisGame, passAction);
-		// throwDice(thisGame, (r % 11) + 2);
-		// makeAction(thisGame, passAction);
-		usleep(1);
-	}
+// 	int i = 0;
+// 	while (i < 100) {
+// 		int r = rand();
+// 		throwDice(thisGame, (r % 11) + 2);
+// 		// throwDice(thisGame, 9);
+// 		// makeAction(thisGame, passAction);
+// 		// throwDice(thisGame, 9);
+// 		// printf("\n------------------------------------\n");
+// 		// printf("Turn #%d\n", i++);
+// 		printf("This is %d's turn\n", getWhoseTurn(thisGame));
+// 		action thisAction = decideAction(thisGame);
+// 		// throwDice(thisGame, 9);
+// 		makeAction(thisGame, thisAction);
+// 		// throwDice(thisGame, (r % 11) + 2);
+// 		// makeAction(thisGame, passAction);
+// 		// throwDice(thisGame, (r % 11) + 2);
+// 		// makeAction(thisGame, passAction);
+// 		usleep(1);
+// 	}
 
-	return EXIT_SUCCESS;
-}
+// 	return EXIT_SUCCESS;
+// }
