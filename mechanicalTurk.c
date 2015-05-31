@@ -545,6 +545,23 @@ int enoughToBuildGO8(Game g, int playerId) {
 		}
 	}
 
+	int numMMONEY = getStudents(g, playerId, STUDENT_MMONEY);
+	int numMJ = getStudents(g, playerId, STUDENT_MJ);
+	int conRateMMONEY = getExchangeRate(g, playerId, STUDENT_MMONEY, STUDENT_MMONEY);
+	int conRateMJ = getExchangeRate(g, playerId, STUDENT_MJ, STUDENT_MJ);
+
+	while (numMMONEY > numMJ && numMMONEY >= 3 + conRateMMONEY) {
+		numMMONEY -= conRateMTV;
+		convertStudents(g, STUDENT_MMONEY, STUDENT_MJ, 1);
+		numMJ++;
+	}
+
+	while (numMJ > numMMONEY && numMJ >= 2 + conRateMTV && numMMONEY < 3) {
+		numMJ -= conRateMJ;
+		convertStudents(g, STUDENT_MJ, STUDENT_MMONEY, 1);
+		numMMONEY++;
+	}
+
 	if (numRequiredMMONEY < 1 && numRequiredMJ < 1) {
 		// printf("Required MMONEY: %d\n", numRequiredMMONEY);
 		// printf("Required MJ: %d\n", numRequiredMJ);
@@ -616,7 +633,7 @@ int enoughToStartSpinoff(Game g, int playerId) {
 		numMTV -= conRateMTV;
 
 		if (numMJ < numMMONEY) {
-			convertStudents(g, STUDENT_MTV, STUDENT_MTV, 1);
+			convertStudents(g, STUDENT_MTV, STUDENT_MJ, 1);
 			numMJ++;
 		} else {
 			convertStudents(g, STUDENT_MTV, STUDENT_MMONEY, 1);
@@ -751,37 +768,37 @@ int enoughToBuildCampus(Game g, int playerId, fromToArc arcPath[2]) {
 		}
 	}
 
-	while (numMJ <= numBQN - 1 && numMJ <= numBPS - 1 && numMTV > 2) {
+	while (numMJ <= numBQN - 1 && numMJ <= numBPS - 1 && numMTV > 1) {
 		convertStudents(g, STUDENT_MTV, STUDENT_MJ, 1);
 		numMTV -= conRateMTV;
 		numMJ++;
 	}
 
-	while (numBPS <= numBQN - 1 && numBPS <= numMJ - 1 && numMTV > 2) {
+	while (numBPS <= numBQN - 1 && numBPS <= numMJ - 1 && numMTV > 1) {
 		convertStudents(g, STUDENT_MTV, STUDENT_BPS, 1);
 		numMTV -= conRateMTV;
 		numBPS++;
 	}
 
-	while(numBQN <= numBPS - 1 && numBQN <= numMJ - 1 && numMTV > 2) {
+	while(numBQN <= numBPS - 1 && numBQN <= numMJ - 1 && numMTV > 1) {
 		convertStudents(g, STUDENT_MTV, STUDENT_BQN, 1);
 		numMTV -= conRateMTV;
 		numBQN++;
 	}
 
-	while (numMJ <= numBQN - 1 && numMJ <= numBPS - 1 && numMMONEY > 2) {
+	while (numMJ <= numBQN - 1 && numMJ <= numBPS - 1 && numMMONEY > 1) {
 		convertStudents(g, STUDENT_MMONEY, STUDENT_MJ, 1);
 		numMMONEY -= conRateMMONEY;
 		numMJ++;
 	}
 
-	while (numBPS <= numBQN - 1 && numBPS <= numMJ - 1 && numMMONEY > 2) {
+	while (numBPS <= numBQN - 1 && numBPS <= numMJ - 1 && numMMONEY > 1) {
 		convertStudents(g, STUDENT_MMONEY, STUDENT_BPS, 1);
 		numMMONEY -= conRateMMONEY;
 		numBPS++;
 	}
 
-	while(numBQN <= numBPS - 1 && numBQN <= numMJ - 1 && numMMONEY > 2) {
+	while(numBQN <= numBPS - 1 && numBQN <= numMJ - 1 && numMMONEY > 1) {
 		convertStudents(g, STUDENT_MMONEY, STUDENT_BQN, 1);
 		numMMONEY -= conRateMMONEY;
 		numBQN++;
