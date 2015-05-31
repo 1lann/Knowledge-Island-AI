@@ -503,23 +503,23 @@ int enoughToBuildGO8(Game g, int playerId) {
 	int changesMade = TRUE;
 
 	int conRateBPS = getExchangeRate(g, playerId, STUDENT_BPS, STUDENT_BPS);
-	int conRateBQN = getExchangeRate(g, playerId, STUDENT_BPS, STUDENT_BQN);
-	int conRateMTV = getExchangeRate(g, playerId, STUDENT_BPS, STUDENT_MTV);
+	int conRateBQN = getExchangeRate(g, playerId, STUDENT_BQN, STUDENT_BQN);
+	int conRateMTV = getExchangeRate(g, playerId, STUDENT_MTV, STUDENT_MTV);
 
 	int numRequiredMJ = 1;
 	int numRequiredMMONEY = 1;
 
-	while (changesMade && numRequiredMJ > 0 && numRequiredMMONEY > 0) {
+	while (changesMade && (numRequiredMJ > 0 || numRequiredMMONEY > 0)) {
 		int effectiveBPS = getStudents(g, playerId, STUDENT_BPS) / conRateBPS;
 		int effectiveBQN = getStudents(g, playerId, STUDENT_BQN) / conRateBQN;
 		int numMJ = getStudents(g, playerId, STUDENT_MJ);
 		int effectiveMTV = getStudents(g, playerId, STUDENT_MTV) / conRateMTV;
 		int numMMONEY = getStudents(g, playerId, STUDENT_MMONEY);
 
-		numRequiredMJ = 3 - numMJ;
+		numRequiredMJ = 2 - numMJ;
 		numRequiredMMONEY = 3 - numMMONEY;
 
-		if (numRequiredMJ > 0 && numRequiredMMONEY > 0) {
+		if (numRequiredMJ > 0 || numRequiredMMONEY > 0) {
 			int toSide;
 
 			if (numRequiredMJ < numRequiredMMONEY) {
@@ -544,6 +544,109 @@ int enoughToBuildGO8(Game g, int playerId) {
 	}
 
 	if (numRequiredMMONEY < 1 && numRequiredMJ < 1) {
+		// printf("Required MMONEY: %d\n", numRequiredMMONEY);
+		// printf("Required MJ: %d\n", numRequiredMJ);
+		// printf("MMONEY: %d\n", getStudents(g, playerId, STUDENT_MMONEY));
+		// printf("MJ: %d\n", getStudents(g, playerId, STUDENT_MJ));
+		result = TRUE;
+	}
+
+	if (getGO8s(g, UNI_A) + getGO8s(g, UNI_B) + getGO8s(g, UNI_C) >= 8) {
+		result = FALSE;
+	}
+
+	return result;
+}
+
+
+int enoughToStartSpinoff(Game g, int playerId) {
+	int result = FALSE;
+
+	int changesMade = TRUE;
+
+	int conRateBPS = getExchangeRate(g, playerId, STUDENT_BPS, STUDENT_BPS);
+	int conRateBQN = getExchangeRate(g, playerId, STUDENT_BQN, STUDENT_BQN);
+
+	int numMJ = 0;
+	int numMTV = 0;
+	int numMMONEY = 0;
+
+	while (changesMade && (numMTV < 1 || numMMONEY < 1 || numMJ < 1)) {
+
+		int effectiveBPS = getStudents(g, playerId, STUDENT_BPS) / conRateBPS;
+		int effectiveBQN = getStudents(g, playerId, STUDENT_BQN) / conRateBQN;
+		numMJ = getStudents(g, playerId, STUDENT_MJ);
+		numMTV = getStudents(g, playerId, STUDENT_MTV);
+		numMMONEY = getStudents(g, playerId, STUDENT_MMONEY);
+
+		if (numMJ < 1 || numMTV < 1 || numMMONEY < 1) {
+			int toSide;
+
+			if (numMJ < 1) {
+				toSide = STUDENT_MJ;
+			} else if (numMTV < 1) {
+				toSide = STUDENT_MTV;
+			} else {
+				toSide = STUDENT_MMONEY;
+			}
+
+			changesMade = FALSE;
+
+			if (effectiveBPS > 0) {
+				changesMade = TRUE;
+				convertStudents(g, STUDENT_BPS, toSide, 1);
+			} else if (effectiveBQN > 0) {
+				changesMade = TRUE;
+				convertStudents(g, STUDENT_BQN, toSide, 1);
+			}
+		}
+	}
+
+	int conRateMTV = getExchangeRate(g, playerId, STUDENT_MTV, STUDENT_MTV);
+	int conRateMJ = getExchangeRate(g, playerId, STUDENT_MJ, STUDENT_MJ);
+	int conRateMMONEY = getExchangeRate(g, playerId, STUDENT_MMONEY, STUDENT_MMONEY);
+
+	numMTV = getStudents(g, playerId, STUDENT_MTV);
+	numMJ = getStudents(g, playerId, STUDENT_MJ);
+	numMMONEY = getStudents(g, playerId, STUDENT_MMONEY);
+
+	while (numMTV > numMJ && numMTV > numMMONEY && numMTV >= conRateMTV) {
+		numMTV -= conRateMTV;
+
+		if (numMJ < numMMONEY) {
+			convertStudents(g, STUDENT_MTV, STUDENT_MTV, 1);
+			numMJ++;
+		} else {
+			convertStudents(g, STUDENT_MTV, STUDENT_MMONEY, 1);
+			numMMONEY++;
+		}
+	}
+
+	while (numMJ > numMTV && numMJ > numMMONEY && numMJ >= conRateMJ) {
+		numMJ -= conRateMJ;
+
+		if (numMTV < numMMONEY) {
+			convertStudents(g, STUDENT_MJ, STUDENT_MTV, 1);
+			numMTV++;
+		} else {
+			convertStudents(g, STUDENT_MJ, STUDENT_MMONEY, 1);
+			numMMONEY++;
+		}
+	}
+
+	while (numMMONEY > numMJ && numMMONEY > numMTV && numMMONEY > conRateMMONEY) {
+		numMMONEY -= conRateMMONEY;
+
+		if (numMJ < numMTV) {
+			convertStudents(g, STUDENT_MMONEY, STUDENT_MJ, 1);
+			numMJ++;
+		} else {
+			convertStudents(g, STUDENT_MMONEY, STUDENT_MTV, 1);
+			numMTV++;
+		}
+	}
+
+	if (numMTV > 0 && numMJ > 0 && numMMONEY > 0) {
 		result = TRUE;
 	}
 
@@ -1035,7 +1138,7 @@ action decideAction(Game g) {
 	int domination = FALSE;
 
 	if (numPossibilities == 0) {
-		printf("Reached domination\n");
+		printf("Reached campus domination\n");
 		domination = TRUE;
 	}
 
@@ -1068,9 +1171,13 @@ action decideAction(Game g) {
 
 		sortWeights(sortedMyCampuses, numMyCampuses);
 
-		if (numMyCampuses == 0 || getGO8s(g, currentPlayer) >= 8) {
-			printf("GO8 Domiation\n");
+		int totalGO8s = getGO8s(g, UNI_A) + getGO8s(g, UNI_B) +
+			getGO8s(g, UNI_C);
+
+		if (numMyCampuses == 0 || totalGO8s >= 8) {
+			printf("Reached GO8 Domiation\n");
 			GO8domination = TRUE;
+			numMyCampuses = 0;
 		}
 
 		i = 0;
@@ -1098,6 +1205,19 @@ action decideAction(Game g) {
 
 	if (GO8domination) {
 		// Wow pls, make spinoffs
+		while (enoughToStartSpinoff(g, currentPlayer)) {
+			action spinoffAction;
+			spinoffAction.actionCode = START_SPINOFF;
+
+			action obtainIPAction;
+			obtainIPAction.actionCode = OBTAIN_IP_PATENT;
+
+			if (isLegalAction(g, spinoffAction)) {
+				makeAction(g, obtainIPAction);
+			} else {
+				printf("Cannot start spinoff\n");
+			}
+		}
 	}
 
 	while (attempt < numPossibilities &&
@@ -1205,7 +1325,7 @@ int main() {
 	passAction.actionCode = PASS;
 
 	int i = 0;
-	while (i < 500) {
+	while (i < 1000) {
 		int r = rand();
 		throwDice(thisGame, (r % 11) + 2);
 		// throwDice(thisGame, 9);
@@ -1217,10 +1337,10 @@ int main() {
 		action thisAction = decideAction(thisGame);
 		// throwDice(thisGame, 9);
 		makeAction(thisGame, thisAction);
-		throwDice(thisGame, (r % 11) + 2);
-		makeAction(thisGame, passAction);
-		throwDice(thisGame, (r % 11) + 2);
-		makeAction(thisGame, passAction);
+		// throwDice(thisGame, (r % 11) + 2);
+		// makeAction(thisGame, passAction);
+		// throwDice(thisGame, (r % 11) + 2);
+		// makeAction(thisGame, passAction);
 		usleep(1);
 	}
 
